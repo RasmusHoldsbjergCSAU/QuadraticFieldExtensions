@@ -1,3 +1,8 @@
+(*
+Verifies the field properties of Quadratic Field Extensions of fields of prime order p,
+where p mod 4 = 3.
+*)
+
 Require Import ZArith Znumtheory.
 Require Import Eqdep_dec.
 Require Import List.
@@ -58,24 +63,24 @@ Lemma beta_is_non_res:
 Proof.
   intros contra. assert (β = (-1 zmod p)) as case by (unfold Quad_non_res; rewrite p_mod3; reflexivity).
   rewrite case in contra; destruct contra as [x H]. inversion H as [H1].
-  assert ((val p x)^(phi p) mod p = 1). apply phi_power_is_1. auto with zarith.
-  apply rel_prime_div with (val p x * val p x).
-  apply rel_prime_sym, prime_rel_prime. apply p_prime. intros contra. apply Zdivide_mod in contra. rewrite contra in H1.
-  rewrite <- Zmod_0_l with (p) in H1. symmetry in H1. discriminate_incongruence H1. 
-  auto with zarith.
-  pose proof p_mod3_eq as H'.
-  assert (p = 4 * (p / 4) + 3) as H2. rewrite <- H'. apply Z_div_mod_eq; auto with zarith.
-  apply (f_equal (fun y => y - 1)) in H2. remember (2 * (p / 4) + 1) as m eqn:Hm2.
-  assert (p - 1 = 2 * m) as Hm; auto with zarith.
-  apply (f_equal (fun y => y^m mod p)) in H1. rewrite <- Zpower_mod in H1; try omega. rewrite <- Zpower_mod in H1; try omega.
-  assert (phi p = p - 1) as H3. apply prime_phi_n_minus_1; apply p_prime.
-  assert ((val p x * val p x)^m = (val p x) ^ (phi p)) as H4. rewrite H3, Hm.
-  assert (2 * m = m + m); auto with zarith.
-  rewrite H4. rewrite Zpower_exp; try auto with zarith; apply Zmult_power; auto with zarith.
-  rewrite <- H4 in H0; rewrite H0 in H1.
-  assert ((-1)^m = -1) as H5 by (rewrite Hm2; apply minus_one_odd_power; omega).
-  rewrite H5, <- Z_mod_plus_full with (-1) (1) (p) in H1.
-  rewrite Zmod_small in H1; try auto with zarith.
+  assert ((val p x)^(phi p) mod p = 1) as H0.
+  - apply phi_power_is_1; auto with zarith.
+    apply rel_prime_div with (val p x * val p x); try auto with zarith; 
+    apply rel_prime_sym, prime_rel_prime; try apply p_prime; intros contra; apply Zdivide_mod in contra; rewrite contra in H1;
+    rewrite <- Zmod_0_l with (p) in H1; symmetry in H1; discriminate_incongruence H1. 
+  - pose proof p_mod3_eq as H'.
+    assert (p = 4 * (p / 4) + 3) as H2 by (rewrite <- H'; apply Z_div_mod_eq; auto with zarith).
+    apply (f_equal (fun y => y - 1)) in H2; remember (2 * (p / 4) + 1) as m eqn:Hm2.
+    assert (p - 1 = 2 * m) as Hm; auto with zarith.
+    apply (f_equal (fun y => y^m mod p)) in H1; rewrite <- Zpower_mod in H1; rewrite <- Zpower_mod in H1; try omega.
+    assert (phi p = p - 1) as H3 by (apply prime_phi_n_minus_1; apply p_prime).
+    assert ((val p x * val p x)^m = (val p x) ^ (phi p)) as H4 by (rewrite H3, Hm;
+    assert (2 * m = m + m); auto with zarith;
+    rewrite H4; rewrite Zpower_exp; try auto with zarith; apply Zmult_power; auto with zarith).
+    rewrite <- H4 in H0; rewrite H0 in H1.
+    assert ((-1)^m = -1) as H5 by (rewrite Hm2; apply minus_one_odd_power; omega).
+    rewrite H5, <- Z_mod_plus_full with (-1) (1) (p) in H1.
+    rewrite Zmod_small in H1; auto with zarith.
 Qed.
 
 
@@ -122,19 +127,19 @@ Definition Zerop_iff: forall x,
   x = zero p <-> val p x = 0.
 intros.
   split.
-  - intros H; destruct x as [xval]; inversion H as [H1]; simpl.
-    rewrite Zmod_small in H1. apply H1. auto with zarith.
+  - intros H; destruct x as [xval]; inversion H as [H1]; simpl;
+    rewrite Zmod_small in H1; try apply H1; auto with zarith.
   - intros H; destruct x as [xval]; refine (zirr p _ _ _ _ _); simpl in H; rewrite H; auto with zarith.
   Qed.
 
 Definition ZpZ_integral_domain: forall x y,
   x <> zero p -> y <> zero p -> (x *p y) <> zero p.
 Proof.
-  intros x y Hx Hy. 
-  intros contra. assert ((one p *p one p) = zero p) as H.
-  assert ((x *p y *p inv p x *p inv p y) = zero p) as H0 by
-  (rewrite contra; field; split; assumption);
-  rewrite <- H0; field; split; assumption.
+  intros x y Hx Hy contra. 
+  assert ((one p *p one p) = zero p) as H by (
+    assert ((x *p y *p inv p x *p inv p y) = zero p) as H0 by
+    (rewrite contra; field; split; assumption);
+    rewrite <- H0; field; split; assumption).
   apply (FZpZ p p_prime); rewrite <- H; field.
 Qed.
 
@@ -161,7 +166,7 @@ Proof.
       * apply Quad_nres_not_zero.
       * intros contra; apply H. rewrite Zerop2_iff, Zerop_iff; auto.
       * apply Zerop_iff in eq1; rewrite eq1; field.
-        split. apply Quad_nres_not_zero.
+        split; try apply Quad_nres_not_zero.
         intros contra; rewrite eq1 in H; rewrite contra in H; contradiction.
     (* Case : x1 is not zero *)
     + apply Z.eqb_neq in eq1; refine (Fp2irr _ _ _ _ _ _); simpl. field. split.
@@ -190,3 +195,5 @@ Proof.
           apply beta_is_non_res; exists (x1 /p x2); rewrite <- contra;
           field; intros contra2; apply Zerop_iff in contra2; apply Z.eqb_neq in eq2; auto.
 Qed.
+
+End Fp2.
