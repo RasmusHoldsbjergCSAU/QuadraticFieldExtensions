@@ -7,7 +7,7 @@ Require Import ZArith Znumtheory.
 Require Import Eqdep_dec.
 Require Import List.
 Require Import Lia.
-Require Import Field.
+From Coq Require Import Field.
 From Coqprime Require Import Euler.
 From Coqprime Require Import UList.
 From Coqprime Require Import GZnZ.
@@ -15,6 +15,8 @@ From Coqprime Require Import Zp.
 From Coqprime Require Import Pmod.
 Require Import Zpow_facts.
 Require Import Znat. 
+
+Primitive Projections.
 
 Section Fp2.
 
