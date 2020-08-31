@@ -43,9 +43,9 @@ Check char_ge.
 
 Require Import Coq.PArith.BinPos.
 
-Check Pos.peano_case.
 
-Check ex_proj1.
+
+Definition n_as_pos (npos : positive): Prop := Zpos npos = n.
 
 Check @char_ge (znz n)%type (@eq (znz n)) (zero n) (one n) (opp n) (add n) (sub n) (mul n).
 
@@ -56,9 +56,9 @@ Check char_znz_n_ge.
 Lemma Char_geq_n: forall npos, n = Zpos npos ->
 char_znz_n_ge npos.
 Proof.
-    Check Pos.peano_case ().
-    apply Pos.peano_case.
-    generalize dependent npos.
+    intros npos Hn. unfold char_znz_n_ge, Hierarchy.char_ge.
+    Check Pos.peano_ind. intros p.
+    apply Pos.peano_ind.
     -
     intros npos Hn. unfold char_ge, Hierarchy.char_ge. intros x Hx contra.
     remember (Pos.to_nat npos) as nnat eqn:Hnat.
