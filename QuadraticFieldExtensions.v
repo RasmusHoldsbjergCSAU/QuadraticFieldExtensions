@@ -13,10 +13,11 @@ From Coqprime Require Import UList.
 From Coqprime Require Import GZnZ.
 From Coqprime Require Import Zp.
 From Coqprime Require Import Pmod.
+(*From QuickChick Require Import QuickChick.
+Import QcNotation.*)
 Require Import Zpow_facts.
 Require Import Znat. 
 
-Primitive Projections.
 
 Section Fp2.
 
