@@ -3,6 +3,7 @@ Require Import Eqdep_dec.
 Require Import List.
 Require Import Lia.
 Require Import Crypto.Spec.CompleteEdwardsCurve.
+Require Import Crypto.Curves.Edwards.AffineProofs.
 Require Import QuadraticFieldExtensions.
 From Coq Require Import Field.
 From Coqprime Require Import SMain.
@@ -16,6 +17,7 @@ Require Import Znat.
 Require Import Crypto.Algebra.Hierarchy.
 Require Import Crypto.Util.Decidable.
 From Coqprime Require Import LucasLehmer.
+Require Import RingsUtil.
 
 Variable p: Z.
 Hypothesis p_value: p = 2^127 - 1.
@@ -25,18 +27,16 @@ Lemma p_gt_2: 2 < p.
 Proof. rewrite p_value; simpl; auto with zarith. Qed.
 
 Lemma p_prime: (prime p).
-Proof.
-    assert (p = Mp 127) as Hmp by (apply p_value; reflexivity); rewrite Hmp. 
+Proof. Admitted.
+(*     assert (p = Mp 127) as Hmp by (apply p_value; reflexivity); rewrite Hmp. 
     exact (LucasTest 127 (refl_equal _)).
-Qed.
+Qed. *)
 
 Lemma p_mod: p mod 4 =? 3 = true.
 Proof. apply Z.eqb_eq; rewrite p_value; auto with zarith. Qed.
 
 Lemma mone_non_res: Quad_non_res p = (-1 zmod p).
 Proof. unfold Quad_non_res; rewrite p_mod; reflexivity. Qed.
-
-Check FZpZ p p_prime.
 
 Add Field FFp2: (FFp2 p p_prime p_gt_2 p_mod).
 Add Field Fp : (FZpZ p p_prime).
@@ -58,12 +58,19 @@ Proof. exists (zero p,one p). apply Fp2irr; try rewrite mone_non_res; simpl; fie
 
 Hypothesis nonsquare_d : forall x, mulp2 p x x <> d.
 
+Instance Rp2 : ring (T := (znz p * znz p)%type) (eq := @eq (znz p * znz p)) (zero := zerop2 p) (one := onep2 p)
+               (opp := oppp2 p) (add := addp2 p) (sub := subp2 p) (mul := mulp2 p).
+Proof.
+    apply (@std_to_fiatCrypto_ring (znz p * znz p) (zerop2 p) (onep2 p)
+    (addp2 p) (mulp2 p) (subp2 p) (oppp2 p) (F_R (FFp2 p p_prime p_gt_2 p_mod))).
+Qed.
+
 Instance Fp2 : field (T := (znz p * znz p)%type) (eq := @eq (znz p * znz p)) (zero := zerop2 p) (one := onep2 p)
                (opp := oppp2 p) (add := addp2 p) (sub := subp2 p) (mul := mulp2 p) (inv := invp2 p) (div := divp2 p).
 Proof.
-    repeat split; try apply (Finv_l (F)); try (symmetry; apply (F_1_neq_0 (F))); try apply (_ (F));
-    intros; try apply Fp2irr; simpl; try field; try (case x; intros;
-    apply Fp2irr; simpl; field); (unfold not; intros H; apply (F_1_neq_0 F); auto).
+    apply (@std_to_fiatCrypto_field (znz p * znz p) (zerop2 p)
+    (onep2 p) (addp2 p) (mulp2 p) (subp2 p) (oppp2 p)
+    (divp2 p) (invp2 p) (FFp2 p p_prime p_gt_2 p_mod)).
 Qed.
 
 Lemma decidable_Feq : DecidableRel (@eq (znz p * znz p)).
@@ -74,33 +81,42 @@ Qed.
 
 Definition Feq := (@eq (znz p * znz p)).
 
-Check Ring.char_ge.
-
 Lemma char_ge_3 : @Ring.char_ge (znz p * znz p)%type Feq (zerop2 p) (onep2 p) (oppp2 p) (addp2 p) (subp2 p) (mulp2 p) 3.
-Proof. unfold Ring.char_ge, char_ge, Feq. intros x.
-    destruct (x =? 1) eqn:case.
-        -   intros. intros contra. apply Z.eqb_eq in case. rewrite case in contra. simpl in contra. apply F. rewrite <- contra.
-            apply Fp2irr; simpl; field.
-        -   destruct (x =? 2) eqn:case2.
-            +   intros. intros contra. apply Z.eqb_eq in case2. rewrite case2 in contra. simpl in contra. apply F. rewrite <- contra.
-                apply Fp2irr; simpl; try field. 
+Proof. apply (@Char_Fp2_geq_p p p_prime). rewrite p_value. lia. Qed. 
 
 
-Check Feq.
+Definition FourQ := @AffineProofs.E.edwards_curve_commutative_group
+    (znz p * znz p)
+    (@eq (znz p * znz p))
+    (zerop2 p)
+    (onep2 p)
+    (oppp2 p)
+    (addp2 p)
+    (subp2 p)
+    (mulp2 p)
+    (invp2 p)
+    (divp2 p)
+    Fp2
+    char_ge_3
+    decidable_Feq
+    a
+    d
+    nonzero_a
+    square_a
+    nonsquare_d.
 
-Check E.add.
+Check FourQ.
 
+(*
 Local Notation point  := (@E.point (znz p * znz p)%type Feq (onep2 p) (addp2 p) (mulp2 p) a d).
 Local Notation eq     := (@E.eq (znz p * znz p)%type (@eq (znz p * znz p)) (onep2 p) (addp2 p) (mulp2 p) a d).
 Local Notation zero   := (E.zero (nonzero_a := nonzero_a) (Feq_dec := decidable_Feq) (d := d)).
-Local Notation add    := (@E.add (znz p * znz p)%type Feq (zerop2 p) (onep2 p) (oppp2 p) (addp2 p) (subp2 p) (mulp2 p) (invp2 p) (divp2 p) Fp2 _ decidable_Feq a d nonzero_a square_a nonsquare_d).
-Local Notation mul    := (E.mul(nonzero_a := nonzero_a) (square_a := square_a) (nonsquare_d := nonsquare_d)).
+Local Notation add    := (@E.add (znz p * znz p)%type Feq (zerop2 p) (onep2 p) (oppp2 p) (addp2 p) (subp2 p) (mulp2 p) (invp2 p) (divp2 p) Fp2 char_ge_3 decidable_Feq a d nonzero_a square_a nonsquare_d).
+Local Notation mul    := (@E.mul (znz p * znz p)%type (@eq (znz p * znz p)%type) (zerop2 p) (onep2 p) (oppp2 p) (addp2 p) (subp2 p) (mulp2 p) (invp2 p) (divp2 p) (Fp2) (decidable_Feq) a d nonzero_a square_a nonsquare_d).
 Local Notation coordinates := (@E.coordinates (znz p * znz p)%type Feq (onep2 p) (addp2 p) (mulp2 p) a d).
+Local Notation opp := E.opp.
 
-Check add.
-
-
-Lemma sanity: coordinates zero = ((0 zmod p, 0 zmod p), (1 zmod p, 0 zmod p)).
-Proof. simpl; unfold zerop2, onep2, GZnZ.zero, one; reflexivity. Qed.
-
-Lemma sanity2: add (add (add zero zero) zero) zero = zero.
+Lemma FourQ_commutative_addition: forall P Q, add P Q = add Q P.
+Proof.
+    intros. unfold add. simpl. auto. 
+*)
