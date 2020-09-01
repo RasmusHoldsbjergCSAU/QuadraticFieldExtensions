@@ -8,6 +8,7 @@ Require Import QuadraticFieldExtensions.
 Require Import Znat.
 Require Import Lia.
 
+(*Relates the specification of a ring in the standard library to that of fiatCrypto. *)
 Section Ring.
     Context {R Rzero Rone Radd Rmul Rsub Ropp}
             {std_ring: @ring_theory R Rzero Rone Radd Rmul Rsub Ropp (@eq R)}.
@@ -20,6 +21,7 @@ Section Ring.
 
 End Ring.
 
+(*Relates to specification of a field in the standard library to that of fiatCrypto. *)
 Section Field.
     Context {F Fzero Fone Fadd Fmul Fsub Fopp Fdiv Finv}
             {std_field: @field_theory F Fzero Fone Fadd Fmul Fsub Fopp Fdiv Finv (@eq F)}.
@@ -33,6 +35,8 @@ Section Field.
     Qed.
 End Field.
 
+
+(* Few elementary results on the characteristics of prime order fields and their binary extensions. *)
 Section Characteristic.
 
     Context {n : Z}.
