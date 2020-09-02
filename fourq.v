@@ -46,6 +46,21 @@ Definition a := (-1 zmod p, zero p).
 Definition d := ( 4205857648805777768770 zmod p,
 125317048443780598345676279555970305165 zmod p).
 
+(* Notation sqrt_five := (0 zmod p, 87392807087336976318005368820707244464 zmod p).
+
+Lemma sqrt_five_square: mulp2 p sqrt_five sqrt_five = (5 zmod p, 0 zmod p).
+Proof.
+     unfold mul. simpl. apply Fp2irr. apply zirr. simpl. rewrite mone_non_res. simpl. repeat rewrite <- Zmult_mod.
+Qed.
+
+
+Lemma p_mod_20: p mod 20 = 7.
+Proof.
+    rewrite p_value. simpl. auto with zarith.
+Qed.
+ *)
+
+
 Lemma nonzero_a: a <> zerop2 p.
 Proof.
     rewrite Zerop2_iff; intros contra; destruct contra as [H1 _].  pose proof p_gt_2 as p_odd.
