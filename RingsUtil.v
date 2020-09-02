@@ -138,5 +138,4 @@ Section Characteristic.
 
     End Field.
 
-
 End Characteristic.
