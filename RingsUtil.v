@@ -108,7 +108,7 @@ Section Characteristic.
         End FZpZ.
 
         Section Fp2.
-
+        
             Hypothesis p_odd: 2 < p.
             Hypothesis p_mod: (p mod 4 =? 3) = true.
             Add Field Fp2 : (FFp2 p p_prime p_odd p_mod).
