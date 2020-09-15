@@ -11,8 +11,11 @@ A specification of quadratic extensions of finite fields (as defined in Coqprime
 
 RingsUtil.v and FieldsUtil.v :
 Contain a few results on rings and fields respectively;
+
     - It is shown that fields and rings of prime order p and their quadratic extensions have characteristic p (as defined in Crypto.Algebra.Ring)
+
     - it is shown that a set with operations satisfying the "field_theory" (or ring_theory) of the standard library is an instance of the field (or ring) class of Crypto.Algebra.Hierarchy.
+    
     - The groups of units of a finite fields is constructed, and it is shown to have order q - 1, where q is the order of the field.
 
 
