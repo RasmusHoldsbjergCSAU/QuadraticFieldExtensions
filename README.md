@@ -1,6 +1,15 @@
 # QuadraticFieldExtensions
 Quadratic Extensions of Prime order Fields - Formalization in Coq
 
+**Dependencies:** Apart from the standard library, Coqprime and fiatCrypto is used. fiatCrypto is consistently referenced as "Crypto".
+
+The line
+-R /home/au543200/Crypto/fiat-crypto/src/ Crypto
+in _CoqProject will need to be changed to    
+-R "PATH" Crypto
+Where "PATH" is a path to fiat-crypto/src/
+
+
 opam install coq-prime
 
 
@@ -8,9 +17,11 @@ opam install coq-prime
 
 A formal specification of the curve FourQ (see https://eprint.iacr.org/2015/565.pdf)
 
+
 **QuadraticFieldExtensions.v**
 
 A specification of quadratic extensions of finite fields (as defined in Coqprime.GZnZ) of order p, where p is a prime number with p mod 4 = 3.
+
 
 **RingsUtil.v and FieldsUtil.v**
 
@@ -23,9 +34,11 @@ Contain a few results on rings and fields respectively.
     - The groups of units of a finite fields is constructed, and it is shown to have order q - 1, where q is the order of the field.
 
 
+
 **RepeatedSquaring**
 
 Contains an algorithm to do exponentiation in monoids via repeated squaring.
+
 
 **SquareTest**
 
