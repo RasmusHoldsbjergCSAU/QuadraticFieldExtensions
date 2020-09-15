@@ -4,9 +4,12 @@ Quadratic Extensions of Prime order Fields - Formalization in Coq
 **Dependencies:** Apart from the standard library, Coqprime and fiatCrypto is used. fiatCrypto is consistently referenced as "Crypto".
 
 The line
+
 -R /home/au543200/Crypto/fiat-crypto/src/ Crypto
+
 in _CoqProject will need to be changed to    
 -R "PATH" Crypto
+
 Where "PATH" is a path to fiat-crypto/src/
 
 
