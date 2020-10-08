@@ -458,7 +458,7 @@ const uint64_t arg1[2] = {16598721700821877158, 58};
 const uint64_t arg2[2] = {10866,0};
 const uint64_t arg3[2] = {130866,0};
 const uint64_t arg4[2] = {4914,0};
-fiat_mulFp2_(&o1, &o2, arg1, arg2, arg3, arg4);
+fiat_mulFp2_(o1, o2, arg1, arg2, arg3, arg4);
 printf("%lu", o1[0]);
 printf(", ");
 printf("%lu", o1[1]);
