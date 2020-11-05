@@ -40,6 +40,7 @@ Definition u := -0xd201000000010000.
 Definition p_of_u u := (((u - 1)^2 * (u^4 - u^2 + 1)) / 3) + u.
 Definition bitwidth := 64.
 Definition p := Eval compute in (p_of_u u).
+Eval native_compute in p.
 Definition w := uweight bitwidth.
 Notation "n 'zmod' p" := (mkznz p (n mod p) (modz p n)) (at level 90).
 Definition n := 6%nat.
@@ -47,7 +48,6 @@ Definition r := 2^bitwidth.
 Definition r' := Eval compute in (val p (GZnZ.inv p (r zmod p))).
 Definition m' := Eval compute in (val r (GZnZ.inv r ((- p) zmod r))).
 
-Eval compute in (m').
 Lemma r'_correct: (r * r') mod p = 1.
 Proof. auto. Qed.
 
@@ -73,6 +73,8 @@ Qed. *)
 Notation "x +Fp y" := (GZnZ.add p x y) (at level 100).
 Notation "x *Fp y" := (GZnZ.mul p x y) (at level 90).
 Notation "x -Fp y" := (GZnZ.sub p x y) (at level 100).
+Notation "x **Fp 2" := (GZnZ.mul p x x) (at level 90).
+
 
 (*Base field arithmetic, encoding and decoding*)
 Definition mulp x y := WordByWordMontgomery.mulmod bitwidth n p m' x y.
@@ -80,11 +82,13 @@ Definition addp x y := WordByWordMontgomery.addmod bitwidth n p x y.
 Definition subp x y := WordByWordMontgomery.submod bitwidth n p x y.
 Definition tomont z := WordByWordMontgomery.encodemod bitwidth n p m' z.
 Definition evalp z := @WordByWordMontgomery.eval bitwidth n (WordByWordMontgomery.from_montgomerymod bitwidth n p m' z).
+Definition squarep x := WordByWordMontgomery.squaremod bitwidth n p m' x.
+
 
 Local Notation "x '+p' y" := (addp x y) (at level 100).
 Local Notation "x *p y" := (mulp x y) (at level 90).
 Local Notation "x -p y" := (subp x y) (at level 100).
-
+Local Notation "x **p 2" := (squarep x) (at level 40).
 
 (*Extended field arithmetic encoding and decoding*)
 Definition addFp2 := fun x y => ((fst x) +p (fst y), (snd x) +p (snd y)).
@@ -97,10 +101,30 @@ Definition mulFp2 := fun x y => let '(x1, x2) := x in
                 ((((x1) +p (x2)) *p ((y1) +p (y2))) -p v0) -p v1
             ).
 Definition subFp2 := fun x y => ((fst x) -p (fst y), (snd x) -p (snd y)). 
+Definition squareFp2 := fun x =>
+    let '(x1, x2) := x in
+        let v0 := x1 *p x2 in
+            (
+                (x1 +p x2) *p (x1 -p x2),
+                v0 +p v0
+            ).
 
 Definition tomontFp2:= fun x => (tomont (val p (fst x)), tomont (val p (snd x))).
 Definition evalFp2:= fun x => (evalp (fst x) zmod p, evalp (snd x) zmod p).
 
+
+(*Testing
+Eval compute in (p).
+Definition z11 := p - 2.
+Definition z12 := p / 2.
+Definition z21 := p - p /3.
+Definition z22 := p - p / 5.
+Definition m11 := tomont z11.
+Definition m12 := tomont z12.
+Definition m21 := tomont z21.
+Definition m22 := tomont z22.
+Definition square := squareFp2 (m11, m12).
+*)
 
 (*A few auxillary results on field arithmetic*)
 Add Field fp : (FZpZ p p_prime).
@@ -114,6 +138,9 @@ Qed.
 
 Lemma karatsuba_correct: forall x1 x2 y1 y2, ((x1 +Fp x2) *Fp (y1 +Fp y2) -Fp x1 *Fp y1 -Fp x2 *Fp y2) = (x1 *Fp y2 +Fp x2 *Fp y1).
 Proof. intros; ring. Qed.
+
+Lemma sum_of_squares: forall x y, ((x **Fp 2) -Fp (y **Fp 2)) = ((x +Fp y) *Fp (x -Fp y)).
+Proof. intros. ring. Qed.
 
 
 (*Proofs of validity (as in Crypto.Arithmetic.WordByWordMontgomery)*)
@@ -143,6 +170,12 @@ Proof.
     1-6: lauto. apply H1; auto.
 Qed.
 
+Lemma square_valid: forall x, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p (x **p 2).
+Proof.
+    intros. pose proof WordByWordMontgomery.squaremod_correct bitwidth n p r' m' as [_ H1].
+    1-6: lauto. apply H1; auto.
+Qed.
+
 
 (*Correctness of evaluation wrt. operations and encoding*)
 Theorem eval_tomont_inv: forall val, 0 <= val < p -> evalp (tomont val) mod p = val.
@@ -159,6 +192,9 @@ Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_addmod with (r' :
 Lemma eval_mul: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x *p y)) mod p = ( evalp x * evalp y ) mod p.
 Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_mulmod with (r' := r'); lauto. Qed.
 
+Lemma eval_square: forall x, WordByWordMontgomery.valid bitwidth n p x -> (evalp (x **p 2)) mod p = (evalp x * evalp x) mod p.
+Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_squaremod with (r' := r'); lauto. Qed.
+
 Lemma eval_sub_mod: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x -p y)) mod p = ( evalp x mod p - evalp y mod p ) mod p.
 Proof. intros; rewrite eval_sub; try assumption; apply Zminus_mod. Qed.
 
@@ -168,35 +204,59 @@ Proof. intros; rewrite eval_add; try assumption; apply Z.add_mod; unfold p; auto
 Lemma eval_mul_mod: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x *p y)) mod p = ( evalp x mod p * (evalp y mod p) ) mod p.
 Proof. intros; rewrite eval_mul; try assumption; apply Z.mul_mod; unfold p; auto with zarith. Qed.
 
+Lemma eval_square_mod: forall x, WordByWordMontgomery.valid bitwidth n p x -> (evalp (x **p 2)) mod p = ((evalp x mod p) * (evalp x mod p)) mod p.
+Proof. intros; rewrite eval_square; try assumption; apply Z.mul_mod; unfold p; auto with zarith. Qed.
+
 
 (*Correctness of extended field operations and encoding*)
+
+(*Tactics to assert the preservation of equivalence between valid lists of numbers in montgomery form and elements of ZpZ, when performing field operations*)
+Ltac reduce_mont_mul := rewrite eval_mul_mod.
+Ltac reduce_mont_add := rewrite eval_add_mod.
+Ltac reduce_mont_sub := rewrite eval_sub_mod.
+
+Ltac assert_valid_ops expr := lazymatch expr with
+    | tomont _ => apply tomont_valid
+    | ?n1 +p ?n2 => apply add_valid; [assert_valid_ops n1| assert_valid_ops n2]
+    | ?n1 *p ?n2 => apply mul_valid; [assert_valid_ops n1| assert_valid_ops n2]
+    | ?n1 -p ?n2 => apply sub_valid; [assert_valid_ops n1| assert_valid_ops n2]
+    | _ => pose proof zirr
+end.
+
+Ltac reduce_mont_op expr := lazymatch expr with
+    | (?n1 *p ?n2) => try (reduce_mont_mul; [reduce_mont_op n1; reduce_mont_op n2|assert_valid_ops (n1)| assert_valid_ops n2])
+    | (?n1 +p ?n2) => try (reduce_mont_add; [reduce_mont_op n1; reduce_mont_op n2| assert_valid_ops n1| assert_valid_ops n2])
+    | (?n1 -p ?n2) => try (reduce_mont_sub; [reduce_mont_op n1; reduce_mont_op n2| assert_valid_ops n1| assert_valid_ops n2])
+    | _ => try rewrite eval_tomont_inv;  [|try apply zpz_le_p]
+end.
+
+Ltac reduce_mont := lazymatch goal with
+    | |- (evalp ?n1) mod p = _ => reduce_mont_op n1
+    | _ => pose proof zirr
+end.
+
 Theorem addFp2_correct: forall x y, evalFp2 (addFp2 (tomontFp2 x) (tomontFp2 y)) = addp2 p x y.
 Proof.
-    intros; apply Fp2irr; simpl; apply zirr; rewrite eval_add_mod; try apply tomont_valid;
-    rewrite 2!eval_tomont_inv; auto; apply zpz_le_p.
+    intros; apply Fp2irr; simpl; apply zirr; reduce_mont; auto.
 Qed.
 
 Theorem subFp2_correct: forall x y , evalFp2 (subFp2 (tomontFp2 x) (tomontFp2 y)) = subp2 p x y.
 Proof.
-    intros; apply Fp2irr; simpl; apply zirr; rewrite eval_sub_mod; try apply tomont_valid;
-    rewrite 2!eval_tomont_inv; auto; apply zpz_le_p.
+    intros; apply Fp2irr; simpl; apply zirr; reduce_mont; auto.
 Qed.
 
 Theorem mul_correct: forall x y, evalFp2 (mulFp2 (tomontFp2 x) (tomontFp2 y)) = mulp2 p x y.
 Proof.
-    intros x y. unfold mulFp2, mulp2. rewrite quad_res_minus_1. simpl. apply Fp2irr.
-    - simpl; rewrite Fp2_opp_sub_equiv; apply zirr; rewrite eval_sub_mod; try (apply mul_valid; apply tomont_valid);
-      rewrite 2!eval_mul_mod; try apply tomont_valid; rewrite 4!eval_tomont_inv; try apply zpz_le_p; reflexivity.
-    - rewrite <- karatsuba_correct; simpl; apply zirr; rewrite 2!eval_sub_mod;
-      [| apply mul_valid; apply add_valid; apply tomont_valid
-       | apply mul_valid; apply tomont_valid
-       | apply sub_valid; apply mul_valid; [apply add_valid| apply add_valid| |]; apply tomont_valid
-       | apply mul_valid; apply tomont_valid].
-      rewrite eval_mul_mod; try ( try apply add_valid; apply tomont_valid);
-      rewrite 2!eval_mul_mod; try apply tomont_valid;
-      rewrite eval_add_mod; try apply tomont_valid;
-      rewrite eval_add_mod; try apply tomont_valid; rewrite 4!eval_tomont_inv; try apply zpz_le_p; reflexivity.
+    intros x y. unfold mulFp2, mulp2. rewrite quad_res_minus_1. simpl. apply Fp2irr; [rewrite Fp2_opp_sub_equiv| rewrite <- karatsuba_correct].
+    all: simpl; apply zirr; reduce_mont; auto.
 Qed.
+
+Theorem square_correct: forall x, evalFp2 (squareFp2 (tomontFp2 x)) = mulp2 p x x.
+Proof.
+    intros x. unfold squareFp2, mulp2. rewrite quad_res_minus_1. simpl. apply Fp2irr; [simpl;  rewrite Fp2_opp_sub_equiv; rewrite sum_of_squares|].
+    all: apply zirr; simpl; reduce_mont; auto with zarith.
+Qed.
+
 
 Theorem to_montFp2_correct: forall x y, evalFp2 (tomontFp2 (x, y)) = (x, y).
 Proof.
@@ -233,6 +293,18 @@ Definition subFp2r x1 x2 y1 y2 := (x1 -p y1, x2 -p y2).
 Lemma subFp2r_correct: forall x y, subFp2r (fst x) (snd x) (fst y) (snd y) = subFp2 x y.
 Proof. auto. Qed.
 
+Definition squareFp2r x1 x2 := 
+    dlet v0 := x1 *p x2 in
+        dlet v1 := x1 +p x2 in
+            dlet v2 := x1 -p x2 in
+                (
+                    v1 *p v2,
+                    v0 +p v0
+                ).
+
+Lemma squareFp2_correct: forall x, squareFp2r (fst x) (snd x) = squareFp2 x.
+Proof. intros [x1 x2]. auto. Qed.
+
 (*Initializing parameters for reification*)
 Local Instance : split_mul_to_opt := None.
 Local Instance : split_multiret_to_opt := None.
@@ -244,6 +316,20 @@ Local Existing Instance ToString.C.OutputCAPI.
 Local Instance : static_opt := true.
 Local Instance : internal_static_opt := true.
 Local Instance : emit_primitives_opt := true.
+
+Check squareFp2r.
+Check addFp2r.
+
+(*
+Compute
+     (Pipeline.BoundsPipelineToString
+     "fiat_" "fiat_squareFp2_"
+     false None [1; 64; 128] 64
+     ltac:(let r := Reify (squareFp2r) in
+           exact r)
+           (fun _ _ => [])
+           (Some (repeat (Some r[0~>2^64 - 1]) 6), (Some (repeat (Some r[0~>2^64 - 1]) 6), tt))%zrange
+           (Some (repeat (Some r[0~>2^64 - 1]) 6), Some (repeat (Some r[0~>2^64 - 1]) 6))%zrange).
 
 Compute
      (Pipeline.BoundsPipelineToString
@@ -318,3 +404,5 @@ Compute
              (fun _ _ => [])
              (Some r[0~>2^64-1], (Some r[0~>2^64-1], tt))%zrange
              (Some r[0~>2^64-1], Some r[0~>2^64-1])%zrange).
+
+*)
