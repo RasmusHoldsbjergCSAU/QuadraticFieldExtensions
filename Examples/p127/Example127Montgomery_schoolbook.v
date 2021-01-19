@@ -41,6 +41,7 @@ Definition s := (2 ^ 127)%Z.
 Definition c := [(1, 1)].
 Definition bitwidth := 64.
 Definition p := Eval compute in (s - Associational.eval c).
+Eval native_compute in p.
 Definition w := uweight bitwidth.
 Notation "n 'zmod' p" := (mkznz p (n mod p) (modz p n)) (at level 90).
 Definition n := 2%nat.
@@ -89,6 +90,7 @@ Local Notation "x -p y" := (subp x y) (at level 100).
 
 (*Extended field arithmetic encoding and decoding*)
 Definition addFp2 := fun x y => ((fst x) +p (fst y), (snd x) +p (snd y)).
+(*
 Definition mulFp2 := fun x y => let '(x1, x2) := x in
     let '(y1, y2) := y in
     dlet v0 := (x1) *p (y1) in
@@ -97,7 +99,17 @@ Definition mulFp2 := fun x y => let '(x1, x2) := x in
                 v0 -p v1,
                 ((((x1) +p (x2)) *p ((y1) +p (y2))) -p v0) -p v1
             ).
-Definition subFp2 := fun x y => ((fst x) -p (fst y), (snd x) -p (snd y)). 
+*)
+
+            Definition subFp2 := fun x y => ((fst x) -p (fst y), (snd x) -p (snd y)). 
+
+Definition mulFp2 := fun x y => let '(x1, x2) := x in
+    let '(y1, y2) := y in
+    (
+        (x1 *p y1) -p (x2 *p y2),
+        (x1 *p y2) +p (x2 *p y1)
+    ).
+ 
 
 Definition tomontFp2:= fun x => (tomont (val p (fst x)), tomont (val p (snd x))).
 Definition evalFp2:= fun x => (evalp (fst x) zmod p, evalp (snd x) zmod p).
@@ -115,6 +127,7 @@ Qed.
 
 Lemma karatsuba_correct: forall x1 x2 y1 y2, ((x1 +Fp x2) *Fp (y1 +Fp y2) -Fp x1 *Fp y1 -Fp x2 *Fp y2) = (x1 *Fp y2 +Fp x2 *Fp y1).
 Proof. intros; ring. Qed.
+
 
 
 (*Proofs of validity (as in Crypto.Arithmetic.WordByWordMontgomery)*)
@@ -188,15 +201,10 @@ Proof.
     intros x y. unfold mulFp2, mulp2. rewrite quad_res_minus_1. simpl. apply Fp2irr.
     - simpl; rewrite Fp2_opp_sub_equiv; apply zirr; rewrite eval_sub_mod; try (apply mul_valid; apply tomont_valid);
       rewrite 2!eval_mul_mod; try apply tomont_valid; rewrite 4!eval_tomont_inv; try apply zpz_le_p; reflexivity.
-    - rewrite <- karatsuba_correct; simpl; apply zirr; rewrite 2!eval_sub_mod;
-      [| apply mul_valid; apply add_valid; apply tomont_valid
-       | apply mul_valid; apply tomont_valid
-       | apply sub_valid; apply mul_valid; [apply add_valid| apply add_valid| |]; apply tomont_valid
-       | apply mul_valid; apply tomont_valid].
-      rewrite eval_mul_mod; try ( try apply add_valid; apply tomont_valid);
-      rewrite 2!eval_mul_mod; try apply tomont_valid;
-      rewrite eval_add_mod; try apply tomont_valid;
-      rewrite eval_add_mod; try apply tomont_valid; rewrite 4!eval_tomont_inv; try apply zpz_le_p; reflexivity.
+    - apply zirr. rewrite Prod.snd_pair. rewrite eval_add_mod.
+      rewrite 2!eval_mul_mod. rewrite 4!eval_tomont_inv; try apply zpz_le_p. reflexivity.
+      1, 2, 3, 4: apply tomont_valid.
+      1, 2 : apply mul_valid; apply tomont_valid.
 Qed.
 
 Theorem to_montFp2_correct: forall x y, evalFp2 (tomontFp2 (x, y)) = (x, y).
@@ -209,19 +217,17 @@ Qed.
 (*Reification and subsequent printing to C of field operations.
   Note that a slightly altered implementation of operations are used;
   their equivalence is shown below. *)
-Definition  mulFp2r x1 x2 y1 y2 :=
+Definition  mulFp2SBr x1 x2 y1 y2 :=
         dlet v0 := (x1) *p (y1) in 
         dlet v1 := (x2) *p (y2) in
-            (
-                v0 -p v1,
-                dlet f1 := x1 +p x2 in
-                    dlet f2 := y1 +p y2 in
-                        dlet v2 := f1 *p f2 in
-                            dlet v3 := v2 -p v0 in
-                                v3 -p v1
-            ).
+        dlet v2 := (x1) *p (y2) in
+        dlet v3 := (x2) *p (y1) in
+        (
+            v0 -p v1,
+            v2 +p v3
+        ).
 
-Lemma mulFp2r_correct: forall x y, mulFp2r (fst x) (snd x) (fst y) (snd y) = mulFp2 x y.
+Lemma mulFp2SBr_correct: forall x y, mulFp2SBr (fst x) (snd x) (fst y) (snd y) = mulFp2 x y.
 Proof. intros [] []; auto. Qed.
 
 Definition addFp2r x1 x2 y1 y2 := (x1 +p y1, x2 +p y2).
@@ -274,12 +280,12 @@ Compute
               exact r)
               (fun _ _ => [])
               (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
-              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange). *)
+              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange).
 
 (* The generated code makes calls to the functions; fiat_cmovznz_u64,
    fiat_addcarryx_u64, fiat_subborrowx_u64 and fiat_mulx_u64.
    These can be generated with the following.*)
-(* 
+
 Compute
   (Pipeline.BoundsPipelineToString
      "fiat_" "fiat_cmovznz_u64"

@@ -1,14 +1,15 @@
 Require Import ZArith Znumtheory.
-From Coq Require Import Field.
+Require Import Coq.setoid_ring.Field.
 From Coqprime Require Import GZnZ.
 From Coqprime Require Import Pmod.
 Require Import Crypto.Algebra.Hierarchy.
 Require Import Crypto.Algebra.Ring.
-Require Import QuadraticFieldExtensions.
+Require Import Theory.QuadraticFieldExtensions.
 Require Import Znat.
 Require Import Lia.
-Require Import RingsUtil.
-Require Import UList.
+Require Import Theory.RingsUtil.
+Require Import Theory.UList.
+Require Import Theory.UListUtil.
 Require Import Lists.List.
 From Coqprime Require Import List.UList.
 From Coqprime Require Import PrimalityTest.IGroup.
@@ -123,7 +124,7 @@ Section UnitGroup.
             + apply isupport_aux_not_in; intros a Ha; right; intros contra2; rewrite contra in contra2;
             simpl in contra2; apply std_field; rewrite <- contra2; field.
         - intros H; simpl; apply isupport_is_in; try FGroupTac; unfold is_inv;
-        apply inv_aux_inv with (support := Flist) (a := Finv x); (FGroupTac; field; auto).
+        apply inv_aux_inv with (A := F) (a := Finv x); (FGroupTac; field; auto).
     Qed.
 
     Lemma Fstar_perm : Permutation.permutation (s Fstar) (remove Decidable_Feq Fzero Flist).

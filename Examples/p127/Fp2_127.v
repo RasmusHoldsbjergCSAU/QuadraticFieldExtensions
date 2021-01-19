@@ -7,7 +7,7 @@ Require Import Lia.
 Require Import Crypto.Arithmetic.Partition.
 Require Import Crypto.Arithmetic.UniformWeight.
 Require Import Crypto.Stringification.IR.
-Require Import QuadraticFieldExtensions.
+Require Import Theory.QuadraticFieldExtensions.
 Require Import Coqprime.elliptic.GZnZ.
 Require Import Coq.Strings.String.
 Require Import Coq.ZArith.ZArith.
@@ -74,7 +74,7 @@ Local Instance : internal_static_opt := true.
 Local Instance : emit_primitives_opt := true.
 
 (*Reification and subsequent printing to C of functions.*)
-
+(* 
 (*cmovznz*)
 Time Redirect "log" Compute
   (Pipeline.BoundsPipelineToString
@@ -121,13 +121,15 @@ Time Redirect "log" Compute
                (Some r[0~>2^64-1], Some r[0~>2^64-1])%zrange).
 
 
+About Pipeline.BoundsPipelineToString.
+
 (*mulFp2*)
 Time Redirect "log" Compute
      (Pipeline.BoundsPipelineToString
         "fiat_" "fiat_mulFp2_"
-        false None [64; 128] 64
+        false None [1; 64; 128] 64
         ltac:(let r := Reify (mulFp2r) in
               exact r)
               (fun _ _ => [])
               (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
-              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange).
+              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange). *)

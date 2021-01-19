@@ -31,37 +31,44 @@ Require Import Crypto.Util.ZUtil.ModInv.
 
 Require Import Crypto.Util.Notations.
 Import ListNotations. Local Open Scope Z_scope.
+(*Implementation of the reduction part of the Separated Operand Scanning method of Montgomery multiplication
+  for more details, see section 4 of https://www.microsoft.com/en-us/research/wp-content/uploads/1996/01/j37acmon.pdf
+  The implementation is designed to compatible with the Fiat Crypto pipeline, so that efficient code can be extracted.
+  Note that some parts were copied from Fiat Crypto, this is made clear when appropriate.*)
 
 Module WordByWordMontgomery.
   Section with_args.
-    Context (lgr : Z)
-            (m : Z).
-    Local Notation weight := (uweight lgr).
-    Let T (n : nat) := list Z.
-    Let r := (2^lgr).
-    Definition eval {n} : T n -> Z := Positional.eval weight n.
-    Let zero {n} : T n := Positional.zeros n.
-    Let divmod {n} : T (S n) -> T n * Z := Rows.divmod.
-    Let scmul {n} (c : Z) (p : T n) : T (S n) (* uses double-output multiply *)
-      := let '(v, c) := Rows.mul weight r n (S n) (Positional.extend_to_length 1 n [c]) p in
-         v. About Rows.add.
-    Let addT {n} (p q : T n) : T (S n) (* joins carry *)
-      := let '(v, c) := Rows.add weight n p q in
-         v ++ [c].
-    Let SOS_red_add {n n'} (p : T n) ( q : T n') :  T (n)
-        := let '(v,c) := (Rows.add weight n p (Positional.extend_to_length n' n q)) in
-         v.
-    Let drop_high_addT' {n} (p : T (S n)) (q : T n) : T (S n) (* drops carry *)
-      := fst (Rows.add weight (S n) p (Positional.extend_to_length n (S n) q)).
-    Let conditional_sub {n} (arg : T (S n)) (N : T n) : T n  (* computes [arg - N] if [N <= arg], and drops high bit *)
-      := Positional.drop_high_to_length n (Rows.conditional_sub weight (S n) arg (Positional.extend_to_length n (S n) N)).
-    Context (R_numlimbs : nat)
-            (N : T R_numlimbs). (* encoding of m *)
-    Let sub_then_maybe_add (a b : T R_numlimbs) : T R_numlimbs (* computes [a - b + if (a - b) <? 0 then N else 0] *)
-      := fst (Rows.sub_then_maybe_add weight R_numlimbs (r-1) a b N).
-      Let T_app {n} (p : T n) (e : Z) : T (S n)
-      := p ++ [e].
-    Local Opaque T.
+  (*... This part (until next ...) is copied from Fiat Crypto Arithmetic/WordByWordMontgomery*)
+        Context (lgr : Z)
+                (m : Z).
+        Local Notation weight := (uweight lgr).
+        Let T (n : nat) := list Z.
+        Let r := (2^lgr).
+        Definition eval {n} : T n -> Z := Positional.eval weight n.
+        Let zero {n} : T n := Positional.zeros n.
+        Let divmod {n} : T (S n) -> T n * Z := Rows.divmod.
+        Let scmul {n} (c : Z) (p : T n) : T (S n) (* uses double-output multiply *)
+          := let '(v, c) := Rows.mul weight r n (S n) (Positional.extend_to_length 1 n [c]) p in
+            v.
+        Let addT {n} (p q : T n) : T (S n) (* joins carry *)
+          := let '(v, c) := Rows.add weight n p q in
+            v ++ [c].
+        Let SOS_red_add {n n'} (p : T n) ( q : T n') :  T (n)
+            := let '(v,c) := (Rows.add weight n p (Positional.extend_to_length n' n q)) in
+            v.
+        Let drop_high_addT' {n} (p : T (S n)) (q : T n) : T (S n) (* drops carry *)
+          := fst (Rows.add weight (S n) p (Positional.extend_to_length n (S n) q)).
+        Let conditional_sub {n} (arg : T (S n)) (N : T n) : T n  (* computes [arg - N] if [N <= arg], and drops high bit *)
+          := Positional.drop_high_to_length n (Rows.conditional_sub weight (S n) arg (Positional.extend_to_length n (S n) N)).
+        Context (R_numlimbs : nat)
+                (N : T R_numlimbs). (* encoding of m *)
+        Let sub_then_maybe_add (a b : T R_numlimbs) : T R_numlimbs (* computes [a - b + if (a - b) <? 0 then N else 0] *)
+          := fst (Rows.sub_then_maybe_add weight R_numlimbs (r-1) a b N).
+          Let T_app {n} (p : T n) (e : Z) : T (S n)
+          := p ++ [e].
+        Local Opaque T.
+    (*... *)
+
     Section red_iteration.
       Context (pred_A_numlimbs : nat)
               (num_it : nat)
@@ -114,113 +121,114 @@ Module WordByWordMontgomery.
       := conditional_sub (red_loop R_numlimbs (Positional.extend_to_length (2 * R_numlimbs) (2 * R_numlimbs + 1) A)) N.
     End red_loop. 
 
+    (*... This part (until next ...) is copied from Fiat Crypto Arithmetic/WordByWordMontgomery*)
+        Create HintDb word_by_word_montgomery.
+        Definition add (A B : T R_numlimbs) : T R_numlimbs
+          := conditional_sub (@addT _ A B) N.
+        Definition sub (A B : T R_numlimbs) : T R_numlimbs
+          := sub_then_maybe_add A B.
+        Definition opp (A : T R_numlimbs) : T R_numlimbs
+          := sub (@zero _) A.
+        Definition nonzero (A : list Z) : Z
+          := fold_right Z.lor 0 A.
 
-    Create HintDb word_by_word_montgomery.
-    Definition add (A B : T R_numlimbs) : T R_numlimbs
-      := conditional_sub (@addT _ A B) N.
-    Definition sub (A B : T R_numlimbs) : T R_numlimbs
-      := sub_then_maybe_add A B.
-    Definition opp (A : T R_numlimbs) : T R_numlimbs
-      := sub (@zero _) A.
-    Definition nonzero (A : list Z) : Z
-      := fold_right Z.lor 0 A.
+        Context (lgr_big : 0 < lgr)
+                (R_numlimbs_nz : R_numlimbs <> 0%nat).
+        Let R := (r^Z.of_nat R_numlimbs).
+        Transparent T.
+        Definition small {n} (v : T n) : Prop
+          := v = Partition.partition weight n (eval v).
+        Definition sc_small sc : Prop
+          := 0 <= sc < r.
 
-    Context (lgr_big : 0 < lgr)
-            (R_numlimbs_nz : R_numlimbs <> 0%nat).
-    Let R := (r^Z.of_nat R_numlimbs).
-    Transparent T.
-    Definition small {n} (v : T n) : Prop
-      := v = Partition.partition weight n (eval v).
-    Definition sc_small sc : Prop
-      := 0 <= sc < r.
+        Context (small_N : small N)
+                (N_lt_R : eval N < R)
+                (N_nz : 0 < eval N)
+                (B : T R_numlimbs)
+                (B_bounds : 0 <= eval B < R)
+                (small_B : small B)
+                ri (ri_correct : r*ri mod (eval N) = 1 mod (eval N))
+                (k : Z) (k_correct : k * eval N mod r = (-1) mod r)
+                (numbits_big: Z.of_nat R_numlimbs < r).
 
-    Context (small_N : small N)
-            (N_lt_R : eval N < R)
-            (N_nz : 0 < eval N)
-            (B : T R_numlimbs)
-            (B_bounds : 0 <= eval B < R)
-            (small_B : small B)
-            ri (ri_correct : r*ri mod (eval N) = 1 mod (eval N))
-            (k : Z) (k_correct : k * eval N mod r = (-1) mod r)
-            (numbits_big: Z.of_nat R_numlimbs < r).
+        Local Lemma r_big : r > 1.
+        Proof using lgr_big. clear -lgr_big; subst r. auto with zarith. Qed.
+        Local Notation wprops := (@uwprops lgr lgr_big).
 
-    Local Lemma r_big : r > 1.
-    Proof using lgr_big. clear -lgr_big; subst r. auto with zarith. Qed.
-    Local Notation wprops := (@uwprops lgr lgr_big).
+        Local Hint Immediate (wprops) : core.
+        Local Hint Immediate (weight_0 wprops) : core.
+        Local Hint Immediate (weight_positive wprops) : core.
+        Local Hint Immediate (weight_multiples wprops) : core.
+        Local Hint Immediate (weight_divides wprops) : core.
+        Local Hint Immediate r_big : core.
 
-    Local Hint Immediate (wprops) : core.
-    Local Hint Immediate (weight_0 wprops) : core.
-    Local Hint Immediate (weight_positive wprops) : core.
-    Local Hint Immediate (weight_multiples wprops) : core.
-    Local Hint Immediate (weight_divides wprops) : core.
-    Local Hint Immediate r_big : core.
+        Lemma length_small {n v} : @small n v -> length v = n.
+        Proof. clear; cbv [small]; intro H; rewrite H; autorewrite with distr_length; reflexivity. Qed.
+        Lemma small_bound {n v} : @small n v -> 0 <= eval v < weight n.
+        Proof using lgr_big. clear - lgr_big; cbv [small eval]; intro H; rewrite H; autorewrite with push_eval; auto with zarith. Qed.
 
-    Lemma length_small {n v} : @small n v -> length v = n.
-    Proof using Type. clear; cbv [small]; intro H; rewrite H; autorewrite with distr_length; reflexivity. Qed.
-    Lemma small_bound {n v} : @small n v -> 0 <= eval v < weight n.
-    Proof using lgr_big. clear - lgr_big; cbv [small eval]; intro H; rewrite H; autorewrite with push_eval; auto with zarith. Qed.
+        Lemma R_plusR_le : R + R <= weight (S R_numlimbs).
+        Proof using lgr_big.
+          clear - lgr_big.
+          etransitivity; [ | apply uweight_double_le; lia ].
+          rewrite uweight_eq_alt by lia.
+          subst r R; lia.
+        Qed.
 
-    Lemma R_plusR_le : R + R <= weight (S R_numlimbs).
-    Proof using lgr_big.
-      clear - lgr_big.
-      etransitivity; [ | apply uweight_double_le; lia ].
-      rewrite uweight_eq_alt by lia.
-      subst r R; lia.
-    Qed.
+        Lemma mask_r_sub1 n x :
+          map (Z.land (r - 1)) (Partition.partition weight n x) = Partition.partition weight n x.
+        Proof using lgr_big.
+          clear - lgr_big. cbv [Partition.partition].
+          rewrite map_map. apply map_ext; intros.
+          rewrite uweight_S by lia.
+          rewrite <-Z.mod_pull_div by auto with zarith.
+          replace (r - 1) with (Z.ones lgr) by (rewrite Z.ones_equiv; subst r; reflexivity).
+          rewrite <-Z.land_comm, Z.land_ones by lia.
+          auto with zarith.
+        Qed.
 
-    Lemma mask_r_sub1 n x :
-      map (Z.land (r - 1)) (Partition.partition weight n x) = Partition.partition weight n x.
-    Proof using lgr_big.
-      clear - lgr_big. cbv [Partition.partition].
-      rewrite map_map. apply map_ext; intros.
-      rewrite uweight_S by lia.
-      rewrite <-Z.mod_pull_div by auto with zarith.
-      replace (r - 1) with (Z.ones lgr) by (rewrite Z.ones_equiv; subst r; reflexivity).
-      rewrite <-Z.land_comm, Z.land_ones by lia.
-      auto with zarith.
-    Qed.
-
-    Let partition_Proper := (@Partition.partition_Proper _ wprops).
-    Local Existing Instance partition_Proper.
-    Lemma eval_nonzero n A : @small n A -> nonzero A = 0 <-> @eval n A = 0.
-    Proof using lgr_big.
-      clear -lgr_big partition_Proper.
-      cbv [nonzero eval small]; intro Heq.
-      do 2 rewrite Heq.
-      rewrite !eval_partition, Z.mod_mod by auto with zarith.
-      generalize (Positional.eval weight n A); clear Heq A.
-      induction n as [|n IHn].
-      { cbn; rewrite weight_0 by auto; intros; autorewrite with zsimplify_const; lia. }
-      { intro; rewrite partition_step.
-        rewrite fold_right_snoc, Z.lor_comm, <- fold_right_push, Z.lor_eq_0_iff by auto using Z.lor_assoc.
-        assert (Heq : Z.equiv_modulo (weight n) (z mod weight (S n)) (z mod (weight n))).
-        { cbv [Z.equiv_modulo].
-          generalize (weight_multiples ltac:(auto) n).
-          generalize (weight_positive ltac:(auto) n).
-          generalize (weight_positive ltac:(auto) (S n)).
-          generalize (weight (S n)) (weight n); clear; intros wsn wn.
-          clear; intros.
-          Z.div_mod_to_quot_rem; subst.
-          autorewrite with zsimplify_const in *.
-          Z.linear_substitute_all.
-          apply Zminus_eq; ring_simplify.
-          rewrite <- !Z.add_opp_r, !Z.mul_opp_comm, <- !Z.mul_opp_r, <- !Z.mul_assoc.
-          rewrite <- !Z.mul_add_distr_l, Z.mul_eq_0.
-          nia. }
-        rewrite Heq at 1; rewrite IHn.
-        rewrite Z.mod_mod by auto with zarith.
-        generalize (weight_multiples ltac:(auto) n).
-        generalize (weight_positive ltac:(auto) n).
-        generalize (weight_positive ltac:(auto) (S n)).
-        generalize (weight (S n)) (weight n); clear; intros wsn wn; intros.
-        Z.div_mod_to_quot_rem.
-        repeat (intro || apply conj); destruct_head'_or; try lia; destruct_head'_and; subst; autorewrite with zsimplify_const in *; try nia;
-          Z.linear_substitute_all.
-        all: apply Zminus_eq; ring_simplify.
-        all: rewrite <- ?Z.add_opp_r, ?Z.mul_opp_comm, <- ?Z.mul_opp_r, <- ?Z.mul_assoc.
-        all: rewrite <- !Z.mul_add_distr_l, Z.mul_eq_0.
-        all: nia. }
-    Qed.
+        Let partition_Proper := (@Partition.partition_Proper _ wprops).
+        Local Existing Instance partition_Proper.
+        Lemma eval_nonzero n A : @small n A -> nonzero A = 0 <-> @eval n A = 0.
+        Proof using lgr_big.
+          clear -lgr_big partition_Proper.
+          cbv [nonzero eval small]; intro Heq.
+          do 2 rewrite Heq.
+          rewrite !eval_partition, Z.mod_mod by auto with zarith.
+          generalize (Positional.eval weight n A); clear Heq A.
+          induction n as [|n IHn].
+          { cbn; rewrite weight_0 by auto; intros; autorewrite with zsimplify_const; lia. }
+          { intro; rewrite partition_step.
+            rewrite fold_right_snoc, Z.lor_comm, <- fold_right_push, Z.lor_eq_0_iff by auto using Z.lor_assoc.
+            assert (Heq : Z.equiv_modulo (weight n) (z mod weight (S n)) (z mod (weight n))).
+            { cbv [Z.equiv_modulo].
+              generalize (weight_multiples ltac:(auto) n).
+              generalize (weight_positive ltac:(auto) n).
+              generalize (weight_positive ltac:(auto) (S n)).
+              generalize (weight (S n)) (weight n); clear; intros wsn wn.
+              clear; intros.
+              Z.div_mod_to_quot_rem; subst.
+              autorewrite with zsimplify_const in *.
+              Z.linear_substitute_all.
+              apply Zminus_eq; ring_simplify.
+              rewrite <- !Z.add_opp_r, !Z.mul_opp_comm, <- !Z.mul_opp_r, <- !Z.mul_assoc.
+              rewrite <- !Z.mul_add_distr_l, Z.mul_eq_0.
+              nia. }
+            rewrite Heq at 1; rewrite IHn.
+            rewrite Z.mod_mod by auto with zarith.
+            generalize (weight_multiples ltac:(auto) n).
+            generalize (weight_positive ltac:(auto) n).
+            generalize (weight_positive ltac:(auto) (S n)).
+            generalize (weight (S n)) (weight n); clear; intros wsn wn; intros.
+            Z.div_mod_to_quot_rem.
+            repeat (intro || apply conj); destruct_head'_or; try lia; destruct_head'_and; subst; autorewrite with zsimplify_const in *; try nia;
+              Z.linear_substitute_all.
+            all: apply Zminus_eq; ring_simplify.
+            all: rewrite <- ?Z.add_opp_r, ?Z.mul_opp_comm, <- ?Z.mul_opp_r, <- ?Z.mul_assoc.
+            all: rewrite <- !Z.mul_add_distr_l, Z.mul_eq_0.
+            all: nia. }
+        Qed.
+    (*... *)
 
 
     (* Proves behavior on eval on appended lists.*)
@@ -255,54 +263,216 @@ Module WordByWordMontgomery.
     Qed.
 
     Local Open Scope Z_scope.
+    (*... This part (until next ...) is copied from Fiat Crypto Arithmetic/WordByWordMontgomery*)
+        Local Ltac push_step :=
+          first [ progress eta_expand
+                | rewrite Rows.mul_partitions
+                | rewrite Rows.mul_div
+                | rewrite Rows.add_partitions
+                | rewrite Rows.add_div
+                | progress autorewrite with push_eval distr_length
+                | match goal with
+                  | [ H : ?v = _ |- context[length ?v] ] => erewrite length_small by eassumption
+                  | [ H : small ?v |- context[length ?v] ] => erewrite length_small by eassumption
+                  end
+                | rewrite Positional.eval_cons by distr_length
+                | progress rewrite ?weight_0, ?uweight_1 by auto;
+                  autorewrite with zsimplify_fast
+                | rewrite (weight_0 wprops)
+                | rewrite <- Z.div_mod'' by auto with lia
+                | solve [ trivial ] ].
+        Local Ltac push := repeat push_step.
 
-    Local Ltac push_step :=
-      first [ progress eta_expand
-            | rewrite Rows.mul_partitions
-            | rewrite Rows.mul_div
-            | rewrite Rows.add_partitions
-            | rewrite Rows.add_div
-            | progress autorewrite with push_eval distr_length
-            | match goal with
-              | [ H : ?v = _ |- context[length ?v] ] => erewrite length_small by eassumption
-              | [ H : small ?v |- context[length ?v] ] => erewrite length_small by eassumption
-              end
-            | rewrite Positional.eval_cons by distr_length
-            | progress rewrite ?weight_0, ?uweight_1 by auto;
-              autorewrite with zsimplify_fast
-            | rewrite (weight_0 wprops)
-            | rewrite <- Z.div_mod'' by auto with lia
-            | solve [ trivial ] ].
-    Local Ltac push := repeat push_step.
+        Local Ltac t_step :=
+          match goal with
+          | [ H := _ |- _ ] => progress cbv [H] in *
+          | _ => progress push_step
+          | _ => progress autorewrite with zsimplify_const
+          | _ => solve [ auto with lia ]
+          end.
 
-    Local Ltac t_step :=
-      match goal with
-      | [ H := _ |- _ ] => progress cbv [H] in *
-      | _ => progress push_step
-      | _ => progress autorewrite with zsimplify_const
-      | _ => solve [ auto with lia ]
-      end.
-
-    Local Hint Unfold eval zero small divmod scmul drop_high_addT' addT R : loc.
-    Local Lemma eval_zero : forall n, eval (@zero n) = 0.
-    Proof using Type.
-      clear; autounfold with loc; intros; autorewrite with push_eval; auto.
-    Qed.
-    Local Lemma small_zero : forall n, small (@zero n).
-    Proof using Type.
-      etransitivity; [ eapply Positional.zeros_ext_map | rewrite eval_zero ]; cbv [Partition.partition]; cbn; try reflexivity; autorewrite with distr_length; reflexivity.
-    Qed.
-    Local Hint Immediate small_zero : core.
+        Local Hint Unfold eval zero small divmod scmul drop_high_addT' addT R : loc.
+        Local Lemma eval_zero : forall n, eval (@zero n) = 0.
+        Proof.
+          clear; autounfold with loc; intros; autorewrite with push_eval; auto.
+        Qed.
+        Local Lemma small_zero : forall n, small (@zero n).
+        Proof.
+          etransitivity; [ eapply Positional.zeros_ext_map | rewrite eval_zero ]; cbv [Partition.partition]; cbn; try reflexivity; autorewrite with distr_length; reflexivity.
+        Qed.
+        Local Hint Immediate small_zero : core.
 
 
-    Ltac push_recursive_partition :=
-      repeat match goal with
-             | _ => progress cbn [recursive_partition]
-             | H : small _ |- _ => rewrite H; clear H
-             | _ => rewrite recursive_partition_equiv by auto using wprops
-             | _ => rewrite uweight_eval_shift by distr_length
-             | _ => progress push
-             end.
+        Ltac push_recursive_partition :=
+          repeat match goal with
+                | _ => progress cbn [recursive_partition]
+                | H : small _ |- _ => rewrite H; clear H
+                | _ => rewrite recursive_partition_equiv by auto using wprops
+                | _ => rewrite uweight_eval_shift by distr_length
+                | _ => progress push
+                end.
+
+        Lemma eval_div : forall n v, small v -> eval (fst (@divmod n v)) = eval v / r.
+        Proof using lgr_big.
+          pose proof r_big as r_big.
+          clear - r_big lgr_big; intros; autounfold with loc.
+          push_recursive_partition; cbn [Rows.divmod fst tl].
+          autorewrite with zsimplify; reflexivity.
+        Qed.
+
+        Lemma eval_mod : forall n v, small v -> snd (@divmod n v) = eval v mod r.
+        Proof using lgr_big.
+          clear - lgr_big; intros; autounfold with loc.
+          push_recursive_partition; cbn [Rows.divmod snd hd].
+          autorewrite with zsimplify; reflexivity.
+        Qed.
+
+        Lemma small_div : forall n v, small v -> small (fst (@divmod n v)).
+        Proof using lgr_big.
+          pose proof r_big as r_big.
+          clear - r_big lgr_big. intros; autounfold with loc.
+          push_recursive_partition. cbn [Rows.divmod fst tl].
+          rewrite <-recursive_partition_equiv by auto.
+          rewrite <-uweight_recursive_partition_equiv with (i:=1%nat) by lia.
+          push.
+          apply Partition.partition_Proper; [ solve [auto] | ].
+          cbv [Z.equiv_modulo]. autorewrite with zsimplify.
+          reflexivity.
+        Qed.
+
+        Definition canon_rep {n} x (v : T n) : Prop :=
+          (v = Partition.partition weight n x) /\ (0 <= x < weight n).
+        Lemma eval_canon_rep n x v : @canon_rep n x v -> eval v = x.
+        Proof using lgr_big.
+          clear - lgr_big.
+          cbv [canon_rep eval]; intros [Hv Hx].
+          rewrite Hv. autorewrite with push_eval.
+          auto using Z.mod_small.
+        Qed.
+        Lemma small_canon_rep n x v : @canon_rep n x v -> small v.
+        Proof using lgr_big.
+          clear - lgr_big.
+          cbv [canon_rep eval small]; intros [Hv Hx].
+          rewrite Hv. autorewrite with push_eval.
+          apply partition_eq_mod; auto; [ ].
+          Z.rewrite_mod_small; reflexivity.
+        Qed.
+
+        Lemma small_nil: @small 0 [].
+        Proof. reflexivity. Qed.
+
+        Local Lemma scmul_correct: forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> canon_rep (a * eval v) (@scmul n a v).
+        Proof using lgr_big.
+          pose proof r_big as r_big.
+          clear - lgr_big r_big.
+          autounfold with loc; intro n; destruct (zerop n); intros *; intro Hsmall; intros.
+          { intros; subst; cbn; rewrite Z.add_with_get_carry_full_mod.
+            split; cbn; autorewrite with zsimplify_fast; auto with zarith. }
+          { rewrite (surjective_pairing (Rows.mul _ _ _ _ _ _)).
+            rewrite Rows.mul_partitions by (try rewrite Hsmall; auto using length_partition, Positional.length_extend_to_length with lia).
+            autorewrite with push_eval.
+            rewrite Positional.eval_cons by reflexivity.
+            rewrite weight_0 by auto.
+            autorewrite with push_eval zsimplify_fast.
+            split; [reflexivity | ].
+            rewrite uweight_S, uweight_eq_alt by lia.
+            subst r; nia. }
+        Qed.
+
+        Lemma length_sc_mul: forall n v sc, n <> O -> length v = n -> length (@scmul n sc v) = S (length v).
+        Proof.
+          intros. unfold scmul. destruct (Rows.mul weight r n (S n)) eqn:eq1.
+          apply (f_equal (fun y => fst y)) in eq1.
+          apply (f_equal (fun (y : list Z) => length y)) in eq1. rewrite Rows.length_mul in eq1. simpl in eq1. rewrite H0.
+          all: auto. simpl. rewrite Positional.length_zeros. auto with zarith.
+        Qed.
+
+        Local Lemma addT_correct : forall n a b, small a -> small b -> canon_rep (eval a + eval b) (@addT n a b).
+        Proof using lgr_big.
+          intros n a b Ha Hb.
+          generalize (length_small Ha); generalize (length_small Hb).
+          generalize (small_bound Ha); generalize (small_bound Hb).
+          clear -lgr_big Ha Hb.
+          autounfold with loc; destruct (zerop n); subst.
+          { destruct a, b; cbn; try lia; split; auto with zarith. }
+          { pose proof (uweight_double_le lgr ltac:(lia) n).
+            eta_expand; split; [ | lia ].
+            rewrite Rows.add_partitions, Rows.add_div by auto.
+            rewrite partition_step.
+            Z.rewrite_mod_small; reflexivity. }
+        Qed.
+
+        Local Lemma drop_high_addT'_correct : forall n a b, small a -> small b -> canon_rep ((eval a + eval b) mod (r^Z.of_nat (S n))) (@drop_high_addT' n a b).
+        Proof using lgr_big.
+          intros n a b Ha Hb; generalize (length_small Ha); generalize (length_small Hb).
+          clear -lgr_big Ha Hb.
+          autounfold with loc in *; subst; intros.
+          rewrite Rows.add_partitions by auto using Positional.length_extend_to_length.
+          autorewrite with push_eval.
+          split; try apply partition_eq_mod; auto; rewrite uweight_eq_alt by lia; subst r; Z.rewrite_mod_small; auto with zarith.
+        Qed.
+
+        Local Lemma conditional_sub_correct : forall v, small v -> 0 <= eval v < eval N + R -> canon_rep (eval v + (if eval N <=? eval v then -eval N else 0)) (conditional_sub v N).
+        Proof using small_N lgr_big N_nz N_lt_R.
+          pose proof R_plusR_le as R_plusR_le.
+          clear - small_N lgr_big N_nz N_lt_R R_plusR_le.
+          intros; autounfold with loc; cbv [conditional_sub].
+          repeat match goal with H : small _ |- _ =>
+                                rewrite H; clear H end.
+          autorewrite with push_eval.
+          assert (weight R_numlimbs < weight (S R_numlimbs)) by (rewrite !uweight_eq_alt by lia; autorewrite with push_Zof_nat; auto with zarith).
+          assert (eval N mod weight R_numlimbs < weight (S R_numlimbs)) by (pose proof (Z.mod_pos_bound (eval N) (weight R_numlimbs) ltac:(auto)); lia).
+          rewrite Rows.conditional_sub_partitions by (repeat (autorewrite with distr_length push_eval; auto using partition_eq_mod with zarith)).
+          rewrite drop_high_to_length_partition by lia.
+          autorewrite with push_eval.
+          assert (weight R_numlimbs = R) by (rewrite uweight_eq_alt by lia; subst R; reflexivity).
+          Z.rewrite_mod_small.
+          break_match; autorewrite with zsimplify_fast; Z.ltb_to_lt.
+          { split; [ reflexivity | ].
+            rewrite Z.add_opp_r. fold (eval N).
+            auto using Z.mod_small with lia. }
+          { split; auto using Z.mod_small with lia. }
+        Qed.
+
+        Local Lemma sub_then_maybe_add_correct : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> canon_rep (eval a - eval b + (if eval a - eval b <? 0 then eval N else 0)) (sub_then_maybe_add a b).
+        Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R.
+          pose proof mask_r_sub1 as mask_r_sub1.
+          clear - small_N lgr_big R_numlimbs_nz N_nz N_lt_R mask_r_sub1.
+          intros; autounfold with loc; cbv [sub_then_maybe_add].
+          repeat match goal with H : small _ |- _ =>
+                                rewrite H; clear H end.
+          rewrite Rows.sub_then_maybe_add_partitions by (autorewrite with push_eval distr_length; auto with zarith).
+          autorewrite with push_eval.
+          assert (weight R_numlimbs = R) by (rewrite uweight_eq_alt by lia; subst r R; reflexivity).
+          Z.rewrite_mod_small.
+          split; [ reflexivity | ].
+          break_match; Z.ltb_to_lt; lia.
+        Qed.
+
+
+        Local Open Scope Z_scope.
+
+        Local Lemma eval_scmul: forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> eval (@scmul n a v) = a * eval v.
+        Proof using lgr_big. eauto using scmul_correct, eval_canon_rep. Qed.
+        Local Lemma small_scmul : forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> small (@scmul n a v).
+        Proof using lgr_big. eauto using scmul_correct, small_canon_rep. Qed.
+        Local Lemma eval_addT : forall n a b, small a -> small b -> eval (@addT n a b) = eval a + eval b.
+        Proof using lgr_big. eauto using addT_correct, eval_canon_rep. Qed.
+        Local Lemma small_addT : forall n a b, small a -> small b -> small (@addT n a b).
+        Proof using lgr_big. eauto using addT_correct, small_canon_rep. Qed.
+        Local Lemma eval_drop_high_addT' : forall n a b, small a -> small b -> eval (@drop_high_addT' n a b) = (eval a + eval b) mod (r^Z.of_nat (S n)).
+        Proof using lgr_big. eauto using drop_high_addT'_correct, eval_canon_rep. Qed.
+        Local Lemma small_drop_high_addT' : forall n a b, small a -> small b -> small (@drop_high_addT' n a b).
+        Proof using lgr_big. eauto using drop_high_addT'_correct, small_canon_rep. Qed.
+        Local Lemma eval_conditional_sub : forall v, small v -> 0 <= eval v < eval N + R -> eval (conditional_sub v N) = eval v + (if eval N <=? eval v then -eval N else 0).
+        Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using conditional_sub_correct, eval_canon_rep. Qed.
+        Local Lemma small_conditional_sub : forall v, small v -> 0 <= eval v < eval N + R -> small (conditional_sub v N).
+        Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using conditional_sub_correct, small_canon_rep. Qed.
+        Local Lemma eval_sub_then_maybe_add : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> eval (sub_then_maybe_add a b) = eval a - eval b + (if eval a - eval b <? 0 then eval N else 0).
+        Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using sub_then_maybe_add_correct, eval_canon_rep. Qed.
+        Local Lemma small_sub_then_maybe_add : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> small (sub_then_maybe_add a b).
+        Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using sub_then_maybe_add_correct, small_canon_rep. Qed.
+    (*... *)          
 
 
     Lemma length_SOS_red_add: forall n1 n2 (A : T n1) (B : T n2), length A = n1 -> length B = n2 -> (n2 <= n1)%nat -> length (SOS_red_add A B) = length A.
@@ -310,56 +480,6 @@ Module WordByWordMontgomery.
       intros. unfold SOS_red_add. simpl.
       rewrite Saturated.Rows.length_sum_rows with (n := length A); auto; rewrite Positional.length_extend_to_length; auto.
     Qed.
-
-    Lemma eval_div : forall n v, small v -> eval (fst (@divmod n v)) = eval v / r.
-    Proof using lgr_big.
-      pose proof r_big as r_big.
-      clear - r_big lgr_big; intros; autounfold with loc.
-      push_recursive_partition; cbn [Rows.divmod fst tl].
-      autorewrite with zsimplify; reflexivity.
-    Qed.
-
-    Lemma eval_mod : forall n v, small v -> snd (@divmod n v) = eval v mod r.
-    Proof using lgr_big.
-      clear - lgr_big; intros; autounfold with loc.
-      push_recursive_partition; cbn [Rows.divmod snd hd].
-      autorewrite with zsimplify; reflexivity.
-    Qed.
-
-    Lemma small_div : forall n v, small v -> small (fst (@divmod n v)).
-    Proof using lgr_big.
-      pose proof r_big as r_big.
-      clear - r_big lgr_big. intros; autounfold with loc.
-      push_recursive_partition. cbn [Rows.divmod fst tl].
-      rewrite <-recursive_partition_equiv by auto.
-      rewrite <-uweight_recursive_partition_equiv with (i:=1%nat) by lia.
-      push.
-      apply Partition.partition_Proper; [ solve [auto] | ].
-      cbv [Z.equiv_modulo]. autorewrite with zsimplify.
-      reflexivity.
-    Qed.
-
-    Definition canon_rep {n} x (v : T n) : Prop :=
-      (v = Partition.partition weight n x) /\ (0 <= x < weight n).
-    Lemma eval_canon_rep n x v : @canon_rep n x v -> eval v = x.
-    Proof using lgr_big.
-      clear - lgr_big.
-      cbv [canon_rep eval]; intros [Hv Hx].
-      rewrite Hv. autorewrite with push_eval.
-      auto using Z.mod_small.
-    Qed.
-    Lemma small_canon_rep n x v : @canon_rep n x v -> small v.
-    Proof using lgr_big.
-      clear - lgr_big.
-      cbv [canon_rep eval small]; intros [Hv Hx].
-      rewrite Hv. autorewrite with push_eval.
-      apply partition_eq_mod; auto; [ ].
-      Z.rewrite_mod_small; reflexivity.
-    Qed.
-
-
-    Lemma small_nil: @small 0 [].
-    Proof. reflexivity. Qed.
     
     (*These proofs gives an alternative characterisation of small lists; the criterion is contained in the definition below*)
     Definition small_crit n v := (Forall sc_small v) /\ (length v = n).
@@ -460,103 +580,9 @@ Module WordByWordMontgomery.
       rewrite Z.mod_small; [rewrite eval_sc; auto| rewrite eval_sc; auto].
     Qed.
 
-    Local Lemma scmul_correct: forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> canon_rep (a * eval v) (@scmul n a v).
-    Proof using lgr_big.
-      pose proof r_big as r_big.
-      clear - lgr_big r_big.
-      autounfold with loc; intro n; destruct (zerop n); intros *; intro Hsmall; intros.
-      { intros; subst; cbn; rewrite Z.add_with_get_carry_full_mod.
-        split; cbn; autorewrite with zsimplify_fast; auto with zarith. }
-      { rewrite (surjective_pairing (Rows.mul _ _ _ _ _ _)).
-        rewrite Rows.mul_partitions by (try rewrite Hsmall; auto using length_partition, Positional.length_extend_to_length with lia).
-        autorewrite with push_eval.
-        rewrite Positional.eval_cons by reflexivity.
-        rewrite weight_0 by auto.
-        autorewrite with push_eval zsimplify_fast.
-        split; [reflexivity | ].
-        rewrite uweight_S, uweight_eq_alt by lia.
-        subst r; nia. }
-    Qed.
-
-    Lemma length_sc_mul: forall n v sc, n <> O -> length v = n -> length (@scmul n sc v) = S (length v).
-    Proof.
-      intros. unfold scmul. destruct (Rows.mul weight r n (S n)) eqn:eq1.
-      apply (f_equal (fun y => fst y)) in eq1.
-      apply (f_equal (fun (y : list Z) => length y)) in eq1. rewrite Rows.length_mul in eq1. simpl in eq1. rewrite H0.
-      all: auto. simpl. rewrite Positional.length_zeros. auto with zarith.
-    Qed.
-
-    Local Lemma addT_correct : forall n a b, small a -> small b -> canon_rep (eval a + eval b) (@addT n a b).
-    Proof using lgr_big.
-      intros n a b Ha Hb.
-      generalize (length_small Ha); generalize (length_small Hb).
-      generalize (small_bound Ha); generalize (small_bound Hb).
-      clear -lgr_big Ha Hb.
-      autounfold with loc; destruct (zerop n); subst.
-      { destruct a, b; cbn; try lia; split; auto with zarith. }
-      { pose proof (uweight_double_le lgr ltac:(lia) n).
-        eta_expand; split; [ | lia ].
-        rewrite Rows.add_partitions, Rows.add_div by auto.
-        rewrite partition_step.
-        Z.rewrite_mod_small; reflexivity. }
-    Qed.
-
-    Local Lemma drop_high_addT'_correct : forall n a b, small a -> small b -> canon_rep ((eval a + eval b) mod (r^Z.of_nat (S n))) (@drop_high_addT' n a b).
-    Proof using lgr_big.
-      intros n a b Ha Hb; generalize (length_small Ha); generalize (length_small Hb).
-      clear -lgr_big Ha Hb.
-      autounfold with loc in *; subst; intros.
-      rewrite Rows.add_partitions by auto using Positional.length_extend_to_length.
-      autorewrite with push_eval.
-      split; try apply partition_eq_mod; auto; rewrite uweight_eq_alt by lia; subst r; Z.rewrite_mod_small; auto with zarith.
-    Qed.
-
-    Local Lemma conditional_sub_correct : forall v, small v -> 0 <= eval v < eval N + R -> canon_rep (eval v + (if eval N <=? eval v then -eval N else 0)) (conditional_sub v N).
-    Proof using small_N lgr_big N_nz N_lt_R.
-      pose proof R_plusR_le as R_plusR_le.
-      clear - small_N lgr_big N_nz N_lt_R R_plusR_le.
-      intros; autounfold with loc; cbv [conditional_sub].
-      repeat match goal with H : small _ |- _ =>
-                             rewrite H; clear H end.
-      autorewrite with push_eval.
-      assert (weight R_numlimbs < weight (S R_numlimbs)) by (rewrite !uweight_eq_alt by lia; autorewrite with push_Zof_nat; auto with zarith).
-      assert (eval N mod weight R_numlimbs < weight (S R_numlimbs)) by (pose proof (Z.mod_pos_bound (eval N) (weight R_numlimbs) ltac:(auto)); lia).
-      rewrite Rows.conditional_sub_partitions by (repeat (autorewrite with distr_length push_eval; auto using partition_eq_mod with zarith)).
-      rewrite drop_high_to_length_partition by lia.
-      autorewrite with push_eval.
-      assert (weight R_numlimbs = R) by (rewrite uweight_eq_alt by lia; subst R; reflexivity).
-      Z.rewrite_mod_small.
-      break_match; autorewrite with zsimplify_fast; Z.ltb_to_lt.
-      { split; [ reflexivity | ].
-        rewrite Z.add_opp_r. fold (eval N).
-        auto using Z.mod_small with lia. }
-      { split; auto using Z.mod_small with lia. }
-    Qed.
-
-    Local Lemma sub_then_maybe_add_correct : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> canon_rep (eval a - eval b + (if eval a - eval b <? 0 then eval N else 0)) (sub_then_maybe_add a b).
-    Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R.
-      pose proof mask_r_sub1 as mask_r_sub1.
-      clear - small_N lgr_big R_numlimbs_nz N_nz N_lt_R mask_r_sub1.
-      intros; autounfold with loc; cbv [sub_then_maybe_add].
-      repeat match goal with H : small _ |- _ =>
-                             rewrite H; clear H end.
-      rewrite Rows.sub_then_maybe_add_partitions by (autorewrite with push_eval distr_length; auto with zarith).
-      autorewrite with push_eval.
-      assert (weight R_numlimbs = R) by (rewrite uweight_eq_alt by lia; subst r R; reflexivity).
-      Z.rewrite_mod_small.
-      split; [ reflexivity | ].
-      break_match; Z.ltb_to_lt; lia.
-    Qed.
-
     Lemma nat_sub: forall x y, (S x <= y)%nat -> S (y - S x) = (y - x)%nat.
     Proof.
        intros. rewrite <- Nat.sub_succ_l. rewrite NPeano.Nat.sub_succ; auto. auto. Qed.
-
-     (*Lemma nat_sub_0: forall y : nat, (y - 0)%nat = y.
-     Proof. auto with zarith. Qed.
-
-     Lemma nat_0_add_r: forall y, (0 + y)%nat = y.
-     Proof. auto. Qed.*)
 
     Lemma extend_app: forall n1 n2 v, Positional.extend_to_length (n1) (n1 + n2) v = (v ++ (Positional.zeros n2)).
     Proof.
@@ -620,30 +646,6 @@ Module WordByWordMontgomery.
       - pose proof (small_bound H0); pose proof (weight_geq' n1 n2); lia.
     Qed.
 
-    Local Open Scope Z_scope.
-
-    Local Lemma eval_scmul: forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> eval (@scmul n a v) = a * eval v.
-    Proof using lgr_big. eauto using scmul_correct, eval_canon_rep. Qed.
-    Local Lemma small_scmul : forall n a v, small v -> 0 <= a < r -> 0 <= eval v < r^Z.of_nat n -> small (@scmul n a v).
-    Proof using lgr_big. eauto using scmul_correct, small_canon_rep. Qed.
-    Local Lemma eval_addT : forall n a b, small a -> small b -> eval (@addT n a b) = eval a + eval b.
-    Proof using lgr_big. eauto using addT_correct, eval_canon_rep. Qed.
-    Local Lemma small_addT : forall n a b, small a -> small b -> small (@addT n a b).
-    Proof using lgr_big. eauto using addT_correct, small_canon_rep. Qed.
-    Local Lemma eval_drop_high_addT' : forall n a b, small a -> small b -> eval (@drop_high_addT' n a b) = (eval a + eval b) mod (r^Z.of_nat (S n)).
-    Proof using lgr_big. eauto using drop_high_addT'_correct, eval_canon_rep. Qed.
-    Local Lemma small_drop_high_addT' : forall n a b, small a -> small b -> small (@drop_high_addT' n a b).
-    Proof using lgr_big. eauto using drop_high_addT'_correct, small_canon_rep. Qed.
-    Local Lemma eval_conditional_sub : forall v, small v -> 0 <= eval v < eval N + R -> eval (conditional_sub v N) = eval v + (if eval N <=? eval v then -eval N else 0).
-    Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using conditional_sub_correct, eval_canon_rep. Qed.
-    Local Lemma small_conditional_sub : forall v, small v -> 0 <= eval v < eval N + R -> small (conditional_sub v N).
-    Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using conditional_sub_correct, small_canon_rep. Qed.
-    Local Lemma eval_sub_then_maybe_add : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> eval (sub_then_maybe_add a b) = eval a - eval b + (if eval a - eval b <? 0 then eval N else 0).
-    Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using sub_then_maybe_add_correct, eval_canon_rep. Qed.
-    Local Lemma small_sub_then_maybe_add : forall a b, small a -> small b -> 0 <= eval a < eval N -> 0 <= eval b < eval N -> small (sub_then_maybe_add a b).
-    Proof using small_N lgr_big R_numlimbs_nz N_nz N_lt_R. eauto using sub_then_maybe_add_correct, small_canon_rep. Qed.
-          
-
     Lemma eval_extend: forall n1 n2 (v : T n2), (n2 <= n1)%nat -> length v = n2 -> eval v =  @eval n1 (Positional.extend_to_length n2 n1 v).
     Proof. intros n1 n2 v H H0. assert (H1 : (n1 = n2 + (n1 - n2))%nat) by auto with zarith. rewrite H1. rewrite extend_app.
       rewrite eval_app; try rewrite Positional.length_zeros; auto. rewrite eval_zero. auto with zarith.
@@ -663,6 +665,8 @@ Module WordByWordMontgomery.
           destruct v'. apply small_rem with (x := z). auto.
     Qed.
     
+  Local Open Scope Z_scope.
+
     Lemma eval_SOS_red_add_mod: forall n1 n2 (v1 : T n1) (v2 : T n2), (n2 <= n1)%nat -> small v1 -> small v2 -> eval (SOS_red_add v1 v2) = (eval v1 + eval v2) mod r ^ Z.of_nat n1.
     Proof.
       intros n1 n2 v1 v2 H H0 H1. unfold SOS_red_add. simpl. unfold eval. rewrite Rows.sum_rows_mod;
@@ -770,59 +774,49 @@ Module WordByWordMontgomery.
           unfold eval in H4. lia. 
     Qed.
 
-    Local Opaque T addT drop_high_addT' divmod zero scmul conditional_sub sub_then_maybe_add.
-    Create HintDb push_mont_eval discriminated.
-    Create HintDb word_by_word_montgomery.
-    Let r_big' := r_big. (* to put it in the context *)
-    Local Ltac t_small :=
-      repeat first [ assumption
-                   | apply small_addT
-                   | apply small_drop_high_addT'
-                   | apply small_div
-                   | apply small_zero
-                   | apply small_scmul
-                   | apply small_conditional_sub
-                   | apply small_sub_then_maybe_add
-                   | apply Z_mod_lt
-                   | rewrite Z.mul_split_mod
-                   | solve [ auto with zarith ]
-                   | lia
-                   | progress autorewrite with push_mont_eval
-                   | progress autounfold with word_by_word_montgomery
-                   | match goal with
-                     | [ H : and _ _ |- _ ] => destruct H
-                     end ].
-    Hint Rewrite
-         eval_zero
-         eval_div
-         eval_mod
-         eval_addT
-         eval_drop_high_addT'
-         eval_scmul
-         eval_conditional_sub
-         eval_sub_then_maybe_add
-         using (repeat autounfold with word_by_word_montgomery; t_small)
-      : push_mont_eval.
+    (*... This part (until next ...) is copied from Fiat Crypto Arithmetic/WordByWordMontgomery*)
+        Local Opaque T addT drop_high_addT' divmod zero scmul conditional_sub sub_then_maybe_add.
+        Create HintDb push_mont_eval discriminated.
+        Create HintDb word_by_word_montgomery.
+        Let r_big' := r_big. (* to put it in the context *)
+        Local Ltac t_small :=
+          repeat first [ assumption
+                      | apply small_addT
+                      | apply small_drop_high_addT'
+                      | apply small_div
+                      | apply small_zero
+                      | apply small_scmul
+                      | apply small_conditional_sub
+                      | apply small_sub_then_maybe_add
+                      | apply Z_mod_lt
+                      | rewrite Z.mul_split_mod
+                      | solve [ auto with zarith ]
+                      | lia
+                      | progress autorewrite with push_mont_eval
+                      | progress autounfold with word_by_word_montgomery
+                      | match goal with
+                        | [ H : and _ _ |- _ ] => destruct H
+                        end ].
+        Hint Rewrite
+            eval_zero
+            eval_div
+            eval_mod
+            eval_addT
+            eval_drop_high_addT'
+            eval_scmul
+            eval_conditional_sub
+            eval_sub_then_maybe_add
+            using (repeat autounfold with word_by_word_montgomery; t_small)
+          : push_mont_eval.
 
-    Local Arguments eval {_} _.
-    Local Arguments small {_} _.
-    Local Arguments divmod {_} _.
+        Local Arguments eval {_} _.
+        Local Arguments small {_} _.
+        Local Arguments divmod {_} _.
+    (*... *)
 
-    (* Section mul_iteration_proofs.
-      Context (pred_A_numlimbs : nat)
-      (A : T (S pred_A_numlimbs))
-      (small_A : small A).
-      (* (S_nonneg : 0 <= eval S). *)
-
-      Local Notation s := (@s pred_A_numlimbs A).
-      Local Notation A' := (@A' pred_A_numlimbs A).
-      Local Notation thism := (@thism pred_A_numlimbs B A S).
-      Local Notation q := (@q pred_A_numlimbs B A S).
-      Local Notation S1 := (@S1 pred_A_numlimbs B A S).
-      Local Notation S2 := (@S2 pred_A_numlimbs B A S).
-
-    End mul_iteration_proofs. *)
-
+    (*The rest of This file contains proofs of correctness; the main correctness theorems are red_correct,
+      which states that the output is a proper multi-limb encoding af a number and that
+      the encoded number evaluates to the correct number*)
     Section red_body_proofs.
       Context (pred_A_numlimbs : nat)
         (N_numlimbs : nat)
@@ -1052,7 +1046,6 @@ Module WordByWordMontgomery.
             rewrite Z.mul_div_eq'; try lia. rewrite S1_mod_r; try lia; try apply small_A'.
             rewrite Z.sub_0_r. rewrite Z.mul_add_distr_r.
             unfold S1.
-            (*adding hypothesis to context to that goal can be solved by*)
             assert (H1 : eval (SOS_red_add A' (q (R_numlimbs + R_numlimbs) A' k)) <= eval A' + eval (q (R_numlimbs + R_numlimbs) A' k)).
             {
               apply eval_SOS_bound; try lia; try apply small_A'. unfold q.

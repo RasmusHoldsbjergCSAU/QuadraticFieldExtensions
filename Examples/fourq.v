@@ -4,8 +4,8 @@ Require Import List.
 Require Import Lia.
 Require Import Crypto.Spec.CompleteEdwardsCurve.
 Require Import Crypto.Curves.Edwards.AffineProofs.
-Require Import QuadraticFieldExtensions.
-From Coq Require Import Field.
+Require Import Theory.QuadraticFieldExtensions.
+Require Import Coq.setoid_ring.Field.
 From Coqprime Require Import SMain.
 From Coqprime Require Import Euler.
 From Coqprime Require Import UList.
@@ -17,9 +17,9 @@ Require Import Znat.
 Require Import Crypto.Algebra.Hierarchy.
 Require Import Crypto.Util.Decidable.
 From Coqprime Require Import LucasLehmer.
-Require Import RingsUtil.
-Require Import FieldsUtil.
-Require Import SquareTest.
+Require Import Theory.RingsUtil.
+Require Import Theory.FieldsUtil.
+Require Import Examples.SquareTest.
 
 Section FourQ.
     Definition p := (2^127 - 1)%Z.
@@ -66,8 +66,6 @@ Section FourQ.
         rewrite <- Z_mod_plus_full with (-1) (1) (p) in H1. simpl in H1;
         do 2 rewrite Zmod_small in H1; auto with zarith.
     Qed.
-
-    Print Rings.
 
     Lemma square_a: exists sqrt_a, mulp2 p sqrt_a sqrt_a = a.
     Proof. exists (zero p,one p). apply Fp2irr; (try rewrite mone_non_res; simpl; field). Qed.

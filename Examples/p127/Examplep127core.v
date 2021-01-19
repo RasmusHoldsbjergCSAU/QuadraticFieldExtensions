@@ -45,8 +45,6 @@ Definition p := s - Associational.eval c.
 Definition w := weight 85 2.
 
 
-Eval compute in w 1.
-Eval compute in 2^53.
 (*
 Lemma s_nz: s <> 0.
 Proof. unfold s; auto with zarith. Qed.
@@ -55,16 +53,10 @@ Lemma m_nz: s - Associational.eval c <> 0.
 Proof. unfold s, c; simpl; auto with zarith. Qed.
 *)
 
-About Positional.mulmod.
-
-About mod_ops.carry_mulmod.
-
 Definition force_carry l := (Positional.chained_carries w 3 s c l [0%nat;1%nat;2%nat]).
 
 Definition mul127 x y := force_carry (Positional.mulmod w s c 3 x y).
 Definition add127 x y := force_carry (Positional.add w 3 x y).
-Check Positional.add.
-Check Positional.sub.
 Definition sub127 x y := force_carry (Positional.sub w 3 [0; 0; 0] x y).
 
 Notation "x +p y" := (add127 x y) (at level 100).
@@ -96,7 +88,7 @@ Definition product := mul127 elem1 elem2.
 Definition sum := add127 elem1 elem2.
 
 Definition test (x1 x2 x3 x4 : list Z) := (x1 +p x2, x2).
-
+(* 
 Compute
      (Pipeline.BoundsPipelineToStrings
         "fiat_" "fial_mulFp2_"
@@ -105,9 +97,4 @@ Compute
               exact r)
               (fun _ _ => [])
               (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
-              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange).
-
-
-
-
-170141183460469231731687303715884105727
+              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange). *)

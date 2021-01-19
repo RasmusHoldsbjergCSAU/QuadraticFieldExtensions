@@ -7,7 +7,7 @@ Require Import Lia.
 Require Import Crypto.Arithmetic.Partition.
 Require Import Crypto.Arithmetic.UniformWeight.
 Require Import Crypto.Stringification.IR.
-Require Import QuadraticFieldExtensions.
+Require Import Theory.QuadraticFieldExtensions.
 Require Import Coqprime.elliptic.GZnZ.
 Require Import Field_theory.
 Require Import Ring_theory.
@@ -40,7 +40,7 @@ Definition u := -0xd201000000010000.
 Definition p_of_u u := (((u - 1)^2 * (u^4 - u^2 + 1)) / 3) + u.
 Definition bitwidth := 64.
 Definition p := Eval compute in (p_of_u u).
-Eval native_compute in p.
+
 Definition w := uweight bitwidth.
 Notation "n 'zmod' p" := (mkznz p (n mod p) (modz p n)) (at level 90).
 Definition n := 6%nat.
@@ -316,9 +316,6 @@ Local Existing Instance ToString.C.OutputCAPI.
 Local Instance : static_opt := true.
 Local Instance : internal_static_opt := true.
 Local Instance : emit_primitives_opt := true.
-
-Check squareFp2r.
-Check addFp2r.
 
 (*
 Compute

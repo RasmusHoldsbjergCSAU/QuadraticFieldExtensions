@@ -36,24 +36,11 @@ Local Open Scope list_scope.
 
 (*Definitions and notation*)
 
-
 Definition s := (2 ^ 127)%Z.
 Definition c := [(1, 1)].
-Definition bitwidth := 64.
 Definition p := Eval compute in (s - Associational.eval c).
-Definition w := uweight bitwidth.
+Definition w := uweight 64.
 Notation "n 'zmod' p" := (mkznz p (n mod p) (modz p n)) (at level 90).
-Definition n := 2%nat.
-Definition r := 2^bitwidth.
-Definition r' := Eval compute in (val p (GZnZ.inv p (r zmod p))).
-Definition m' := Eval compute in (val r (GZnZ.inv r ((- p) zmod r))).
-
-Eval compute in (m').
-Lemma r'_correct: (r * r') mod p = 1.
-Proof. auto. Qed.
-
-Lemma m'_correct: (p * m') mod r = (-1) mod r.
-Proof. auto. Qed.
 
 (*A few results on prime and base field.*)
 Lemma p_ge2: 2 < p.
@@ -79,8 +66,8 @@ Notation "x -Fp y" := (GZnZ.sub p x y) (at level 100).
 Definition mulp x y := WordByWordMontgomery.mulmod 64 2 p 1 x y.
 Definition addp x y := WordByWordMontgomery.addmod 64 2 p x y.
 Definition subp x y := WordByWordMontgomery.submod 64 2 p x y.
-Definition tomont z := WordByWordMontgomery.encodemod bitwidth n p m' z.
-Definition evalp z := @WordByWordMontgomery.eval bitwidth n (WordByWordMontgomery.from_montgomerymod bitwidth n p m' z).
+Definition tomont z := WordByWordMontgomery.encodemod 64 2 p 1 z.
+Definition evalp z := @WordByWordMontgomery.eval 64 2 (WordByWordMontgomery.from_montgomerymod 64 2 p 1 z).
 
 Local Notation "x '+p' y" := (addp x y) (at level 100).
 Local Notation "x *p y" := (mulp x y) (at level 90).
@@ -119,28 +106,28 @@ Proof. intros; ring. Qed.
 
 (*Proofs of validity (as in Crypto.Arithmetic.WordByWordMontgomery)*)
 
-Ltac lauto := auto with zarith; try unfold p; try unfold n; try unfold bitwidth; lia.
-Lemma tomont_valid: forall x, WordByWordMontgomery.valid bitwidth n p (tomont (val p x)).
+Ltac lauto := auto with zarith; unfold p; lia.
+Lemma tomont_valid: forall x, WordByWordMontgomery.valid 64 2 p (tomont (val p x)).
 Proof.
-    intros; unfold tomont; pose proof WordByWordMontgomery.encodemod_correct bitwidth n p (r') m' as [_ H0].
-    1-6: lauto. apply H0; case x; intros; simpl; rewrite inZnZ; apply Z_mod_lt; unfold p; lia.
+    intros; unfold tomont; pose proof WordByWordMontgomery.encodemod_correct 64 2 p (2^63) 1 as [_ H0].
+    1-6: lauto. apply H0; case x; intros; auto; simpl; rewrite inZnZ; apply Z_mod_lt; unfold p; lia.
 Qed.
 
-Lemma add_valid: forall x y,WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> WordByWordMontgomery.valid bitwidth n p (x +p y).
+Lemma add_valid: forall x y,WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> WordByWordMontgomery.valid 64 2 p (x +p y).
 Proof.
-    intros; pose proof WordByWordMontgomery.addmod_correct bitwidth n p r' m' as [_ H1].
+    intros; pose proof WordByWordMontgomery.addmod_correct 64 2 p (2^63) 1 as [_ H1].
     1-6: lauto. apply H1; auto.
 Qed.
 
-Lemma sub_valid: forall x y,WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> WordByWordMontgomery.valid bitwidth n p (x -p y).
+Lemma sub_valid: forall x y,WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> WordByWordMontgomery.valid 64 2 p (x -p y).
 Proof.
-    intros; pose proof WordByWordMontgomery.submod_correct bitwidth n p r' m' as [_ H1].
+    intros; pose proof WordByWordMontgomery.submod_correct 64 2 p (2^63) 1 as [_ H1].
     1-6: lauto. apply H1; auto.
 Qed.
 
-Lemma mul_valid: forall x y,WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> WordByWordMontgomery.valid bitwidth n p (x *p y).
+Lemma mul_valid: forall x y,WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> WordByWordMontgomery.valid 64 2 p (x *p y).
 Proof.
-    intros; pose proof WordByWordMontgomery.mulmod_correct bitwidth n p r' m' as [_ H1].
+    intros; pose proof WordByWordMontgomery.mulmod_correct 64 2 p (2^63) 1 as [_ H1].
     1-6: lauto. apply H1; auto.
 Qed.
 
@@ -148,25 +135,25 @@ Qed.
 (*Correctness of evaluation wrt. operations and encoding*)
 Theorem eval_tomont_inv: forall val, 0 <= val < p -> evalp (tomont val) mod p = val.
 Proof.
-    intros val H; unfold evalp, tomont; rewrite WordByWordMontgomery.eval_encodemod with (r' := r'); try lauto.
+    intros val H; unfold evalp, tomont; rewrite WordByWordMontgomery.eval_encodemod with (r' := 2 ^ 63); try lauto.
 Qed.
 
-Lemma eval_sub: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x -p y)) mod p = ( evalp x - evalp y ) mod p.
-Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_submod with (r' := r'); lauto. Qed.
+Lemma eval_sub: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x -p y)) mod p = ( evalp x - evalp y ) mod p.
+Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_submod with (r' := 2 ^ 63); lauto. Qed.
 
-Lemma eval_add: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x +p y)) mod p = ( evalp x + evalp y ) mod p.
-Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_addmod with (r' := r'); lauto. Qed.
+Lemma eval_add: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x +p y)) mod p = ( evalp x + evalp y ) mod p.
+Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_addmod with (r' := 2 ^ 63); lauto. Qed.
 
-Lemma eval_mul: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x *p y)) mod p = ( evalp x * evalp y ) mod p.
-Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_mulmod with (r' := r'); lauto. Qed.
+Lemma eval_mul: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x *p y)) mod p = ( evalp x * evalp y ) mod p.
+Proof. intros; unfold evalp; rewrite WordByWordMontgomery.eval_mulmod with (r' := 2 ^ 63); lauto. Qed.
 
-Lemma eval_sub_mod: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x -p y)) mod p = ( evalp x mod p - evalp y mod p ) mod p.
+Lemma eval_sub_mod: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x -p y)) mod p = ( evalp x mod p - evalp y mod p ) mod p.
 Proof. intros; rewrite eval_sub; try assumption; apply Zminus_mod. Qed.
 
-Lemma eval_add_mod: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x +p y)) mod p = ( evalp x mod p + evalp y mod p ) mod p.
+Lemma eval_add_mod: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x +p y)) mod p = ( evalp x mod p + evalp y mod p ) mod p.
 Proof. intros; rewrite eval_add; try assumption; apply Z.add_mod; unfold p; auto with zarith. Qed.
 
-Lemma eval_mul_mod: forall x y, WordByWordMontgomery.valid bitwidth n p x -> WordByWordMontgomery.valid bitwidth n p y -> (evalp (x *p y)) mod p = ( evalp x mod p * (evalp y mod p) ) mod p.
+Lemma eval_mul_mod: forall x y, WordByWordMontgomery.valid 64 2 p x -> WordByWordMontgomery.valid 64 2 p y -> (evalp (x *p y)) mod p = ( evalp x mod p * (evalp y mod p) ) mod p.
 Proof. intros; rewrite eval_mul; try assumption; apply Z.mul_mod; unfold p; auto with zarith. Qed.
 
 
@@ -203,7 +190,7 @@ Theorem to_montFp2_correct: forall x y, evalFp2 (tomontFp2 (x, y)) = (x, y).
 Proof.
     intros x y; apply injective_projections; [case x | case y];
     intros val Hval; apply zirr; simpl; apply eval_tomont_inv;
-    rewrite Hval; apply Z_mod_lt; unfold p; simpl; lia.
+    rewrite Hval; apply Z_mod_lt; unfold p, c, s; simpl; lia.
 Qed.
 
 (*Reification and subsequent printing to C of field operations.
@@ -235,7 +222,7 @@ Lemma subFp2r_correct: forall x y, subFp2r (fst x) (snd x) (fst y) (snd y) = sub
 Proof. auto. Qed.
 
 (*Initializing parameters for reification*)
-(* Local Instance : split_mul_to_opt := None.
+Local Instance : split_mul_to_opt := None.
 Local Instance : split_multiret_to_opt := None.
 Local Instance : unfold_value_barrier_opt := true.
 Local Instance : only_signed_opt := false.
@@ -246,6 +233,8 @@ Local Instance : static_opt := true.
 Local Instance : internal_static_opt := true.
 Local Instance : emit_primitives_opt := true.
 
+
+(* 
 Compute
      (Pipeline.BoundsPipelineToString
      "fiat_" "fiat_addFp2_"
@@ -266,20 +255,21 @@ Compute
            (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
            (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange).
 
+
 Compute
-     (Pipeline.BoundsPipelineToString
-        "fiat_" "fiat_mulFp2_"
-        false None [1; 64; 128] 64
-        ltac:(let r := Reify (mulFp2r) in
-              exact r)
-              (fun _ _ => [])
-              (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
-              (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange). *)
+(Pipeline.BoundsPipelineToString
+   "fiat_" "fiat_mulFp2_"
+   false None [1; 64; 128] 64
+   ltac:(let r := Reify (mulFp2r) in
+         exact r)
+         (fun _ _ => [])
+         (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2), (Some (repeat (Some r[0~>2^64 - 1]) 2) , (Some (repeat (Some r[0~>2^64 - 1]) 2), tt))))%zrange
+         (Some (repeat (Some r[0~>2^64 - 1]) 2), Some (repeat (Some r[0~>2^64 - 1]) 2))%zrange).
 
 (* The generated code makes calls to the functions; fiat_cmovznz_u64,
    fiat_addcarryx_u64, fiat_subborrowx_u64 and fiat_mulx_u64.
    These can be generated with the following.*)
-(* 
+
 Compute
   (Pipeline.BoundsPipelineToString
      "fiat_" "fiat_cmovznz_u64"

@@ -4,7 +4,7 @@ Require Import List.
 Require Import Lia.
 Require Import Permutation.
 Require Import Coq.Lists.List.
-From Coq Require Import Field.
+Require Import Coq.setoid_ring.Field.
 From Coqprime Require Import Euler.
 From Coqprime Require Import UList.
 From Coqprime Require Import GZnZ.
@@ -17,9 +17,9 @@ Require Import Coqprime.PrimalityTest.FGroup.
 Require Import Crypto.Util.Decidable.
 Require Import Crypto.Algebra.Hierarchy.
 Require Import Coqprime.PrimalityTest.EGroup.
-Require Import FieldsUtil.
-Require Import UList.
-Require Import RepeatedSquaring.
+Require Import Theory.FieldsUtil.
+Require Import Theory.UListUtil.
+Require Import Theory.RepeatedSquaring.
 
 Section Squaretest.
   Context {F: Set}

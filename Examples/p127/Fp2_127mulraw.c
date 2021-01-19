@@ -566,7 +566,7 @@ void main() {
 const uint64_t arg1[2] = {9223372036854775804, 58};
 const uint64_t arg2[2] = {10866,4};
 const uint64_t arg3[2] = {130866,2};
-const uint64_t arg4[2] = {4914,1188};
+const uint64_t arg4[2] = {4914,5};
 printf("operands are: \n");
 printf("(%lu, %lu) + i(%lu, %lu)", arg1[0], arg1[1], arg2[0], arg2[1]);
 printf("\nand \n");

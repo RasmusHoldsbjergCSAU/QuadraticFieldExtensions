@@ -1,10 +1,10 @@
 Require Import ZArith Znumtheory.
-From Coq Require Import Field.
+Require Import Coq.setoid_ring.Field.
 From Coqprime Require Import GZnZ.
 From Coqprime Require Import Pmod.
 Require Import Crypto.Algebra.Hierarchy.
 Require Import Crypto.Algebra.Ring.
-Require Import QuadraticFieldExtensions.
+Require Import Theory.QuadraticFieldExtensions.
 Require Import Znat.
 Require Import Lia.
 
