@@ -1,48 +1,14 @@
-# QuadraticFieldExtensions
-Quadratic Extensions of Prime order Fields - Formalization in Coq
+# Formal Verification of Cryptographic primitives.
 
-**Dependencies:** Apart from the standard library, Coqprime and fiatCrypto is used. fiatCrypto is consistently referenced as "Crypto".
+In this Project, we treat quadratic field extensions, with the goal of developing efficient formally verified implementations of elliptic curves to be used in cryptographic applications such as digital signature scheme.
 
-The line
+**Theory**
+We develop the theory of quadratic field extensions.
+This includes a number of results such as the construction of the group of units for finite fields, exponentiation by repeated squaring in monoids and of course the construction of the field extensions themselves.
 
--R /home/au543200/Crypto/fiat-crypto/src/ Crypto
-
-in _CoqProject will need to be changed to    
--R "PATH" Crypto
-
-Where "PATH" is a path to fiat-crypto/src/
-
-
-opam install coq-prime
-
-
-**FourQ.v**
-
-A formal specification of the curve FourQ (see https://eprint.iacr.org/2015/565.pdf)
-
-
-**QuadraticFieldExtensions.v**
-
-A specification of quadratic extensions of finite fields (as defined in Coqprime.GZnZ) of order p, where p is a prime number with p mod 4 = 3.
-
-
-**RingsUtil.v and FieldsUtil.v**
-
-Contain a few results on rings and fields respectively.
-
-    - It is shown that fields and rings of prime order p and their quadratic extensions have characteristic p (as defined in Crypto.Algebra.Ring)
-
-    - it is shown that a set with operations satisfying the "field_theory" (or ring_theory) of the standard library is an instance of the field (or ring) class of Crypto.Algebra.Hierarchy.
-
-    - The groups of units of a finite fields is constructed, and it is shown to have order q - 1, where q is the order of the field.
-
-
-
-**RepeatedSquaring**
-
-Contains an algorithm to do exponentiation in monoids via repeated squaring.
-
-
-**SquareTest**
-
-Verifies that an element, x, of a finite field is not a square, if x^(q - 1)/2 is not 1, where q is the order of the field.
+**Implementations**
+Finite field arithmetic is being performed in the montgomery domain, see (https://www.microsoft.com/en-us/research/wp-content/uploads/1996/01/j37acmon.pdf).
+In order to produce efficient implementations, we make use of a lazy reduction scheme for arithmetic in the extended field.
+An important piece of the puzzle is the "separated operand scanning" method of doing montgomery multiplication (section 4 in the article above).
+This project therefore contains a formally verified specification of This method, which is compatible with the Fiat Crypto pipeline and thus may be extracted to working code.
+TODO: Implement lazy reduction arithmetic using the separated montgomery multiplication.
