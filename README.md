@@ -1,6 +1,6 @@
 # Formal Verification of Cryptographic primitives.
 
-In this Project, we treat quadratic field extensions, with the goal of developing efficient formally verified implementations of elliptic curves to be used in cryptographic applications such as digital signature scheme.
+In this Project, we treat quadratic field extensions using the Coq proof assistant, with the goal of developing efficient formally verified implementations of elliptic curves to be used in cryptographic applications such as digital signature schemes.
 
 **Theory**
 We develop the theory of quadratic field extensions.
